@@ -25,7 +25,6 @@ use SimpleXMLElement;
  * XML handling for CakePHP.
  *
  * The methods in these classes enable the datasources that use XML to work.
- *
  */
 class Xml
 {
@@ -56,7 +55,7 @@ class Xml
      * Building XML from a remote URL:
      *
      * ```
-     * use Cake\Network\Http\Client;
+     * use Cake\Http\Client;
      *
      * $http = new Client();
      * $response = $http->get('http://example.com/example.xml');
@@ -160,6 +159,7 @@ class Xml
         if ($xml === null) {
             throw new XmlException('Xml cannot be read.');
         }
+
         return $xml;
     }
 
@@ -203,8 +203,8 @@ class Xml
      */
     public static function fromArray($input, $options = [])
     {
-        if (method_exists($input, 'toArray')) {
-            $input = $input->toArray();
+        if (is_object($input) && method_exists($input, 'toArray') && is_callable([$input, 'toArray'])) {
+            $input = call_user_func([$input, 'toArray']);
         }
         if (!is_array($input) || count($input) !== 1) {
             throw new XmlException('Invalid input.');
@@ -236,6 +236,7 @@ class Xml
         if ($options['return'] === 'simplexml' || $options['return'] === 'simplexmlelement') {
             return new SimpleXMLElement($dom->saveXML());
         }
+
         return $dom;
     }
 
@@ -256,8 +257,8 @@ class Xml
         }
         foreach ($data as $key => $value) {
             if (is_string($key)) {
-                if (method_exists($value, 'toArray')) {
-                    $value = $value->toArray();
+                if (is_object($value) && method_exists($value, 'toArray') && is_callable([$value, 'toArray'])) {
+                    $value = call_user_func([$value, 'toArray']);
                 }
 
                 if (!is_array($value)) {
@@ -322,8 +323,8 @@ class Xml
     {
         extract($data);
         $childNS = $childValue = null;
-        if (method_exists($value, 'toArray')) {
-            $value = $value->toArray();
+        if (is_object($value) && method_exists($value, 'toArray') && is_callable([$value, 'toArray'])) {
+            $value = call_user_func([$value, 'toArray']);
         }
         if (is_array($value)) {
             if (isset($value['@'])) {
@@ -368,6 +369,7 @@ class Xml
         $result = [];
         $namespaces = array_merge(['' => ''], $obj->getNamespaces(true));
         static::_toArray($obj, $result, '', array_keys($namespaces));
+
         return $result;
     }
 

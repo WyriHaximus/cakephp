@@ -15,7 +15,6 @@ namespace Cake\Test\TestCase\Core;
 
 use Cake\Core\StaticConfigTrait;
 use Cake\TestSuite\TestCase;
-use PHPUnit_Framework_Test;
 
 /**
  * TestConnectionManagerStaticConfig
@@ -47,6 +46,7 @@ class TestConnectionManagerStaticConfig
         }
 
         unset($config['path']);
+
         return $config;
     }
 
@@ -129,7 +129,6 @@ class TestLogStaticConfig
 
 /**
  * StaticConfigTraitTest class
- *
  */
 class StaticConfigTraitTest extends TestCase
 {

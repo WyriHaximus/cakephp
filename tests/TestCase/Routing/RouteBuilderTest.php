@@ -158,9 +158,31 @@ class RouteBuilderTest extends TestCase
         $routes = new RouteBuilder($this->collection, '/articles', ['controller' => 'Articles']);
         $routes->connect('/', ['action' => 'index']);
 
-        $expected = ['plugin' => null, 'controller' => 'Articles', 'action' => 'index', 'pass' => []];
+        $expected = [
+            'plugin' => null,
+            'controller' => 'Articles',
+            'action' => 'index',
+            'pass' => [],
+            '_matchedRoute' => '/articles',
+        ];
         $this->assertEquals($expected, $this->collection->parse('/articles'));
         $this->assertEquals($expected, $this->collection->parse('/articles/'));
+    }
+
+    /**
+     * Test if a route name already exist
+     *
+     * @return void
+     */
+    public function testNameExists()
+    {
+        $routes = new RouteBuilder($this->collection, '/l', ['prefix' => 'api']);
+
+        $this->assertFalse($routes->nameExists('myRouteName'));
+
+        $routes->connect('myRouteUrl', ['action' => 'index'], ['_name' => 'myRouteName']);
+
+        $this->assertTrue($routes->nameExists('myRouteName'));
     }
 
     /**
@@ -188,6 +210,28 @@ class RouteBuilderTest extends TestCase
         $new = $this->collection->routes()[1];
         $this->assertEquals(['json'], $route->options['_ext']);
         $this->assertEquals(['xml', 'json'], $new->options['_ext']);
+    }
+
+    /**
+     * Test adding additional extensions will be merged with current.
+     *
+     * @return void
+     */
+    public function testConnectExtensionsAdd()
+    {
+        $routes = new RouteBuilder(
+            $this->collection,
+            '/l',
+            [],
+            ['extensions' => ['json']]
+        );
+        $this->assertEquals(['json'], $routes->extensions());
+
+        $routes->addExtensions(['xml']);
+        $this->assertEquals(['json', 'xml'], $routes->extensions());
+
+        $routes->addExtensions('csv');
+        $this->assertEquals(['json', 'xml', 'csv'], $routes->extensions());
     }
 
     /**
@@ -230,8 +274,8 @@ class RouteBuilderTest extends TestCase
      */
     public function testConnectConflictingParameters()
     {
-        $routes = new RouteBuilder($this->collection, '/admin', ['prefix' => 'admin']);
-        $routes->connect('/', ['prefix' => 'manager', 'controller' => 'Dashboard', 'action' => 'view']);
+        $routes = new RouteBuilder($this->collection, '/admin', ['plugin' => 'TestPlugin']);
+        $routes->connect('/', ['plugin' => 'TestPlugin2', 'controller' => 'Dashboard', 'action' => 'view']);
     }
 
     /**
@@ -345,6 +389,39 @@ class RouteBuilderTest extends TestCase
     }
 
     /**
+     * Test connecting resources with a prefix
+     *
+     * @return void
+     */
+    public function testResourcesPrefix()
+    {
+        $routes = new RouteBuilder($this->collection, '/api');
+        $routes->resources('Articles', ['prefix' => 'rest']);
+        $all = $this->collection->routes();
+        $this->assertEquals('rest', $all[0]->defaults['prefix']);
+    }
+
+    /**
+     * Test that resource prefixes work within a prefixed scope.
+     *
+     * @return void
+     */
+    public function testResourcesNestedPrefix()
+    {
+        $routes = new RouteBuilder($this->collection, '/api', ['prefix' => 'api']);
+        $routes->resources('Articles', ['prefix' => 'rest']);
+
+        $all = $this->collection->routes();
+        $this->assertCount(5, $all);
+
+        $this->assertEquals('/api/articles', $all[0]->template);
+        foreach ($all as $route) {
+            $this->assertEquals('api/rest', $route->defaults['prefix']);
+            $this->assertEquals('Articles', $route->defaults['controller']);
+        }
+    }
+
+    /**
      * Test connecting resources with the inflection option
      *
      * @return void
@@ -363,6 +440,30 @@ class RouteBuilderTest extends TestCase
             array_keys($all[0]->defaults)
         );
         $this->assertEquals('BlogPosts', $all[0]->defaults['controller']);
+    }
+
+    /**
+     * Test connecting nested resources with the inflection option
+     *
+     * @return void
+     */
+    public function testResourcesNestedInflection()
+    {
+        $routes = new RouteBuilder($this->collection, '/api');
+        $routes->resources(
+            'NetworkObjects',
+            ['inflect' => 'dasherize'],
+            function ($routes) {
+                $routes->resources('Attributes');
+            }
+        );
+
+        $all = $this->collection->routes();
+        $this->assertCount(10, $all);
+
+        $this->assertEquals('/api/network-objects', $all[0]->template);
+        $this->assertEquals('/api/network-objects/:id', $all[2]->template);
+        $this->assertEquals('/api/network-objects/:network_object_id/attributes', $all[5]->template);
     }
 
     /**

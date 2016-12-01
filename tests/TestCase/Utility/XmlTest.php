@@ -18,12 +18,10 @@ use Cake\Collection\Collection;
 use Cake\Core\Configure;
 use Cake\ORM\Entity;
 use Cake\TestSuite\TestCase;
-use Cake\Utility\Exception\XmlException;
 use Cake\Utility\Xml;
 
 /**
  * XmlTest class
- *
  */
 class XmlTest extends TestCase
 {
@@ -1180,5 +1178,35 @@ XML;
 </request>
 XML;
         $result = Xml::build($xml);
+    }
+
+    /**
+     * Test building Xml with valid class-name in value.
+     *
+     * @see https://github.com/cakephp/cakephp/pull/9754
+     * @return void
+     */
+    public function testClassnameInValueRegressionTest()
+    {
+        $classname = self::class; // Will always be a valid class name
+        $data = [
+            'outer' => [
+                'inner' => $classname
+            ]
+        ];
+        $obj = Xml::build($data);
+        $result = $obj->asXml();
+        $this->assertContains('<inner>' . $classname . '</inner>', $result);
+    }
+
+    /**
+     * Needed function for testClassnameInValueRegressionTest.
+     *
+     * @ignore
+     * @return array
+     */
+    public function toArray()
+    {
+        return [];
     }
 }

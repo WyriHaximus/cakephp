@@ -14,12 +14,9 @@
  */
 namespace Cake\Test\TestCase\Database\Driver;
 
-use Cake\Core\Configure;
-use Cake\Database\Connection;
-use Cake\Database\Driver\Sqlserver;
 use Cake\Database\Query;
 use Cake\TestSuite\TestCase;
-use \PDO;
+use PDO;
 
 /**
  * Tests Sqlserver driver
@@ -57,21 +54,23 @@ class SqlserverTest extends TestCase
             'init' => ['Execute this', 'this too'],
             'settings' => ['config1' => 'value1', 'config2' => 'value2'],
         ];
-        $driver = $this->getMock(
-            'Cake\Database\Driver\Sqlserver',
-            ['_connect', 'connection'],
-            [$config]
-        );
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlserver')
+            ->setMethods(['_connect', 'connection'])
+            ->setConstructorArgs([$config])
+            ->getMock();
         $dsn = 'sqlsrv:Server=foo;Database=bar;MultipleActiveResultSets=false';
 
         $expected = $config;
         $expected['flags'] += [
             PDO::ATTR_PERSISTENT => false,
+            PDO::ATTR_EMULATE_PREPARES => false,
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::SQLSRV_ATTR_ENCODING => 'a-language'
         ];
 
-        $connection = $this->getMock('stdClass', ['exec', 'quote']);
+        $connection = $this->getMockBuilder('stdClass')
+            ->setMethods(['exec', 'quote'])
+            ->getMock();
         $connection->expects($this->any())
             ->method('quote')
             ->will($this->onConsecutiveCalls(
@@ -102,34 +101,32 @@ class SqlserverTest extends TestCase
      */
     public function testSelectLimitVersion12()
     {
-        $driver = $this->getMock(
-            'Cake\Database\Driver\Sqlserver',
-            ['_connect', 'connection', '_version'],
-            [[]]
-        );
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlserver')
+            ->setMethods(['_connect', 'connection', '_version'])
+            ->setConstructorArgs([[]])
+            ->getMock();
         $driver
             ->expects($this->any())
             ->method('_version')
             ->will($this->returnValue(12));
 
-        $connection = $this->getMock(
-            '\Cake\Database\Connection',
-            ['connect', 'driver'],
-            [['log' => false]]
-        );
+        $connection = $this->getMockBuilder('\Cake\Database\Connection')
+            ->setMethods(['connect', 'driver'])
+            ->setConstructorArgs([['log' => false]])
+            ->getMock();
         $connection
             ->expects($this->any())
             ->method('driver')
             ->will($this->returnValue($driver));
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->order(['id'])
             ->offset(10);
         $this->assertEquals('SELECT id, title FROM articles ORDER BY id OFFSET 10 ROWS', $query->sql());
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->order(['id'])
@@ -137,13 +134,13 @@ class SqlserverTest extends TestCase
             ->offset(50);
         $this->assertEquals('SELECT id, title FROM articles ORDER BY id OFFSET 50 ROWS FETCH FIRST 10 ROWS ONLY', $query->sql());
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->offset(10);
         $this->assertEquals('SELECT id, title FROM articles ORDER BY (SELECT NULL) OFFSET 10 ROWS', $query->sql());
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->limit(10);
@@ -157,34 +154,32 @@ class SqlserverTest extends TestCase
      */
     public function testSelectLimitOldServer()
     {
-        $driver = $this->getMock(
-            'Cake\Database\Driver\Sqlserver',
-            ['_connect', 'connection', '_version'],
-            [[]]
-        );
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlserver')
+            ->setMethods(['_connect', 'connection', '_version'])
+            ->setConstructorArgs([[]])
+            ->getMock();
         $driver
             ->expects($this->any())
             ->method('_version')
             ->will($this->returnValue(8));
 
-        $connection = $this->getMock(
-            '\Cake\Database\Connection',
-            ['connect', 'driver'],
-            [['log' => false]]
-        );
+        $connection = $this->getMockBuilder('\Cake\Database\Connection')
+            ->setMethods(['connect', 'driver'])
+            ->setConstructorArgs([['log' => false]])
+            ->getMock();
         $connection
             ->expects($this->any())
             ->method('driver')
             ->will($this->returnValue($driver));
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->limit(10);
         $expected = 'SELECT TOP 10 id, title FROM articles';
         $this->assertEquals($expected, $query->sql());
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->offset(10);
@@ -193,7 +188,7 @@ class SqlserverTest extends TestCase
             'WHERE _cake_paging_._cake_page_rownum_ > 10';
         $this->assertEquals($expected, $query->sql());
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->order(['id'])
@@ -203,7 +198,7 @@ class SqlserverTest extends TestCase
             'WHERE _cake_paging_._cake_page_rownum_ > 10';
         $this->assertEquals($expected, $query->sql());
 
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->select(['id', 'title'])
             ->from('articles')
             ->order(['id'])
@@ -223,21 +218,19 @@ class SqlserverTest extends TestCase
      */
     public function testInsertUsesOutput()
     {
-        $driver = $this->getMock(
-            'Cake\Database\Driver\Sqlserver',
-            ['_connect', 'connection'],
-            [[]]
-        );
-        $connection = $this->getMock(
-            '\Cake\Database\Connection',
-            ['connect', 'driver'],
-            [['log' => false]]
-        );
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlserver')
+            ->setMethods(['_connect', 'connection'])
+            ->setConstructorArgs([[]])
+            ->getMock();
+        $connection = $this->getMockBuilder('\Cake\Database\Connection')
+            ->setMethods(['connect', 'driver'])
+            ->setConstructorArgs([['log' => false]])
+            ->getMock();
         $connection
             ->expects($this->any())
             ->method('driver')
             ->will($this->returnValue($driver));
-        $query = new \Cake\Database\Query($connection);
+        $query = new Query($connection);
         $query->insert(['title'])
             ->into('articles')
             ->values(['title' => 'A new article']);

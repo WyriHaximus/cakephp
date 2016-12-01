@@ -95,9 +95,6 @@ class StringTemplateTest extends TestCase
         ];
         $this->template->add($templates);
 
-        $result = $this->template->format('not there', []);
-        $this->assertNull($result);
-
         $result = $this->template->format('text', ['text' => '']);
         $this->assertSame('', $result);
 
@@ -115,6 +112,22 @@ class StringTemplateTest extends TestCase
             'templateVars' => ['var1' => 'foo']
         ]);
         $this->assertEquals('<custom default v1="foo" v2="" />', $result);
+    }
+
+    /**
+     * Test formatting strings with URL encoding
+     *
+     * @return void
+     */
+    public function testFormatUrlEncoding()
+    {
+        $templates = [
+            'test' => '<img src="/img/foo%20bar.jpg">{{text}}',
+        ];
+        $this->template->add($templates);
+
+        $result = $this->template->format('test', ['text' => 'stuff!']);
+        $this->assertSame('<img src="/img/foo%20bar.jpg">stuff!', $result);
     }
 
     /**
@@ -140,6 +153,22 @@ class StringTemplateTest extends TestCase
             'text' => ['key' => 'example', 'text']
         ]);
         $this->assertEquals('<a href="/">exampletext</a>', $result);
+    }
+
+    /**
+     * Test formatting a missing template.
+     *
+     * @expectedException \RuntimeException
+     * @expectedExceptionMessage Cannot find template named 'missing'
+     * @return void
+     */
+    public function testFormatMissingTemplate()
+    {
+        $templates = [
+            'text' => '{{text}}',
+        ];
+        $this->template->add($templates);
+        $this->template->format('missing', ['text' => 'missing']);
     }
 
     /**
@@ -208,10 +237,10 @@ class StringTemplateTest extends TestCase
      */
     public function testFormatAttributes()
     {
-        $attrs = ['name' => 'bruce', 'data-hero' => '<batman>'];
+        $attrs = ['name' => 'bruce', 'data-hero' => '<batman>', 'spellcheck' => 'true'];
         $result = $this->template->formatAttributes($attrs);
         $this->assertEquals(
-            ' name="bruce" data-hero="&lt;batman&gt;"',
+            ' name="bruce" data-hero="&lt;batman&gt;" spellcheck="true"',
             $result
         );
 

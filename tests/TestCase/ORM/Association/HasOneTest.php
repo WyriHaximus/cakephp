@@ -19,18 +19,14 @@ use Cake\Database\Expression\QueryExpression;
 use Cake\Database\TypeMap;
 use Cake\ORM\Association\HasOne;
 use Cake\ORM\Entity;
-use Cake\ORM\Query;
-use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
 
 /**
  * Tests HasOne class
- *
  */
 class HasOneTest extends TestCase
 {
-
     /**
      * Set up
      *
@@ -65,6 +61,9 @@ class HasOneTest extends TestCase
             'first_name' => 'string',
             'Profiles.user_id' => 'integer',
             'user_id' => 'integer',
+            'Profiles__first_name' => 'string',
+            'Profiles__user_id' => 'integer',
+            'Profiles__id' => 'integer',
         ]);
     }
 
@@ -98,7 +97,10 @@ class HasOneTest extends TestCase
      */
     public function testAttachTo()
     {
-        $query = $this->getMock('\Cake\ORM\Query', ['join', 'select'], [null, null]);
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['join', 'select'])
+            ->setConstructorArgs([null, null])
+            ->getMock();
         $config = [
             'foreignKey' => 'user_id',
             'sourceTable' => $this->user,
@@ -123,6 +125,12 @@ class HasOneTest extends TestCase
             'Profiles__user_id' => 'Profiles.user_id'
         ]);
         $association->attachTo($query);
+
+        $this->assertEquals(
+            'string',
+            $query->typeMap()->type('Profiles__first_name'),
+            'Associations should map types.'
+        );
     }
 
     /**
@@ -132,7 +140,10 @@ class HasOneTest extends TestCase
      */
     public function testAttachToNoFields()
     {
-        $query = $this->getMock('\Cake\ORM\Query', ['join', 'select'], [null, null]);
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['join', 'select'])
+            ->setConstructorArgs([null, null])
+            ->getMock();
         $config = [
             'sourceTable' => $this->user,
             'targetTable' => $this->profile,
@@ -162,7 +173,10 @@ class HasOneTest extends TestCase
      */
     public function testAttachToMultiPrimaryKey()
     {
-        $query = $this->getMock('\Cake\ORM\Query', ['join', 'select'], [null, null]);
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['join', 'select'])
+            ->setConstructorArgs([null, null])
+            ->getMock();
         $config = [
             'sourceTable' => $this->user,
             'targetTable' => $this->profile,
@@ -197,7 +211,10 @@ class HasOneTest extends TestCase
      */
     public function testAttachToMultiPrimaryKeyMistmatch()
     {
-        $query = $this->getMock('\Cake\ORM\Query', ['join', 'select'], [null, null]);
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['join', 'select'])
+            ->setConstructorArgs([null, null])
+            ->getMock();
         $config = [
             'sourceTable' => $this->user,
             'targetTable' => $this->profile,
@@ -215,7 +232,10 @@ class HasOneTest extends TestCase
      */
     public function testSaveAssociatedOnlyEntities()
     {
-        $mock = $this->getMock('Cake\ORM\Table', [], [], '', false);
+        $mock = $this->getMockBuilder('Cake\ORM\Table')
+            ->setMethods(['saveAssociated'])
+            ->disableOriginalConstructor()
+            ->getMock();
         $config = [
             'sourceTable' => $this->user,
             'targetTable' => $mock,
@@ -254,7 +274,9 @@ class HasOneTest extends TestCase
      */
     public function testPropertyNoPlugin()
     {
-        $mock = $this->getMock('Cake\ORM\Table', [], [], '', false);
+        $mock = $this->getMockBuilder('Cake\ORM\Table')
+            ->disableOriginalConstructor()
+            ->getMock();
         $config = [
             'sourceTable' => $this->user,
             'targetTable' => $mock,
@@ -271,13 +293,18 @@ class HasOneTest extends TestCase
      */
     public function testAttachToBeforeFind()
     {
-        $query = $this->getMock('\Cake\ORM\Query', ['join', 'select'], [null, null]);
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['join', 'select'])
+            ->setConstructorArgs([null, null])
+            ->getMock();
         $config = [
             'foreignKey' => 'user_id',
             'sourceTable' => $this->user,
             'targetTable' => $this->profile,
         ];
-        $listener = $this->getMock('stdClass', ['__invoke']);
+        $listener = $this->getMockBuilder('stdClass')
+            ->setMethods(['__invoke'])
+            ->getMock();
         $this->profile->eventManager()->attach($listener, 'Model.beforeFind');
         $association = new HasOne('Profiles', $config);
         $listener->expects($this->once())->method('__invoke')
@@ -298,13 +325,18 @@ class HasOneTest extends TestCase
      */
     public function testAttachToBeforeFindExtraOptions()
     {
-        $query = $this->getMock('\Cake\ORM\Query', ['join', 'select'], [null, null]);
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['join', 'select'])
+            ->setConstructorArgs([null, null])
+            ->getMock();
         $config = [
             'foreignKey' => 'user_id',
             'sourceTable' => $this->user,
             'targetTable' => $this->profile,
         ];
-        $listener = $this->getMock('stdClass', ['__invoke']);
+        $listener = $this->getMockBuilder('stdClass')
+            ->setMethods(['__invoke'])
+            ->getMock();
         $this->profile->eventManager()->attach($listener, 'Model.beforeFind');
         $association = new HasOne('Profiles', $config);
         $opts = new \ArrayObject(['something' => 'more']);

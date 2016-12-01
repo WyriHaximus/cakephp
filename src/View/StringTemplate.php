@@ -16,6 +16,7 @@ namespace Cake\View;
 
 use Cake\Core\Configure\Engine\PhpConfig;
 use Cake\Core\InstanceConfigTrait;
+use RuntimeException;
 
 /**
  * Provides an interface for registering and inserting
@@ -75,7 +76,6 @@ class StringTemplate
         'seamless' => true,
         'selected' => true,
         'sortable' => true,
-        'spellcheck' => true,
         'truespeed' => true,
         'typemustmatch' => true,
         'visible' => true,
@@ -86,8 +86,7 @@ class StringTemplate
      *
      * @var array
      */
-    protected $_defaultConfig = [
-    ];
+    protected $_defaultConfig = [];
 
     /**
      * A stack of template sets that have been stashed temporarily.
@@ -158,6 +157,7 @@ class StringTemplate
     {
         $this->config($templates);
         $this->_compileTemplates(array_keys($templates));
+
         return $this;
     }
 
@@ -178,6 +178,7 @@ class StringTemplate
                 $this->_compiled[$name] = [null, null];
             }
 
+            $template = str_replace('%', '%%', $template);
             preg_match_all('#\{\{([\w\d\._]+)\}\}#', $template, $matches);
             $this->_compiled[$name] = [
                 str_replace($matches[0], '%s', $template),
@@ -225,12 +226,9 @@ class StringTemplate
     public function format($name, array $data)
     {
         if (!isset($this->_compiled[$name])) {
-            return null;
+            throw new RuntimeException("Cannot find template named '$name'.");
         }
         list($template, $placeholders) = $this->_compiled[$name];
-        if ($template === null) {
-            return null;
-        }
 
         if (isset($data['templateVars'])) {
             $data += $data['templateVars'];
@@ -244,6 +242,7 @@ class StringTemplate
             }
             $replace[] = $replacement;
         }
+
         return vsprintf($template, $replace);
     }
 
@@ -292,6 +291,7 @@ class StringTemplate
             }
         }
         $out = trim(implode(' ', $attributes));
+
         return $out ? $insertBefore . $out : '';
     }
 
@@ -320,6 +320,7 @@ class StringTemplate
         if ($isMinimized) {
             return '';
         }
+
         return $key . '="' . ($escape ? h($value) : $value) . '"';
     }
 }

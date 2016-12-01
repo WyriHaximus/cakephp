@@ -54,6 +54,7 @@ class OrderClauseExpression implements ExpressionInterface, FieldInterface
         if ($field instanceof ExpressionInterface) {
             $field = $field->sql($generator);
         }
+
         return sprintf("%s %s", $field, $this->_direction);
     }
 
@@ -65,6 +66,18 @@ class OrderClauseExpression implements ExpressionInterface, FieldInterface
         if ($this->_field instanceof ExpressionInterface) {
             $visitor($this->_field);
             $this->_field->traverse($visitor);
+        }
+    }
+
+    /**
+     * Create a deep clone of the order clause.
+     *
+     * @return void
+     */
+    public function __clone()
+    {
+        if ($this->_field instanceof ExpressionInterface) {
+            $this->_field = clone $this->_field;
         }
     }
 }

@@ -15,15 +15,17 @@ namespace Cake\TestSuite;
 
 use Cake\Core\Configure;
 use Cake\Database\Exception as DatabaseException;
-use Cake\Network\Request;
 use Cake\Network\Session;
-use Cake\Routing\DispatcherFactory;
 use Cake\Routing\Router;
-use Cake\TestSuite\Stub\Response;
+use Cake\TestSuite\LegacyRequestDispatcher;
+use Cake\TestSuite\MiddlewareDispatcher;
+use Cake\Utility\CookieCryptTrait;
 use Cake\Utility\Hash;
+use Cake\Utility\Security;
 use Cake\Utility\Text;
 use Cake\View\Helper\SecureFieldTokenTrait;
 use Exception;
+use LogicException;
 use PHPUnit_Exception;
 
 /**
@@ -38,7 +40,30 @@ use PHPUnit_Exception;
  */
 abstract class IntegrationTestCase extends TestCase
 {
+    use CookieCryptTrait;
     use SecureFieldTokenTrait;
+
+    /**
+     * Track whether or not tests are run against
+     * the PSR7 HTTP stack.
+     *
+     * @var bool
+     */
+    protected $_useHttpServer = false;
+
+    /**
+     * The customized application class name.
+     *
+     * @var string|null
+     */
+    protected $_appClass;
+
+    /**
+     * The customized application constructor arguments.
+     *
+     * @var array|null
+     */
+    protected $_appArgs;
 
     /**
      * The data used to build the next request.
@@ -120,6 +145,24 @@ abstract class IntegrationTestCase extends TestCase
     protected $_csrfToken = false;
 
     /**
+     *
+     * @var null|string
+     */
+    protected $_cookieEncriptionKey = null;
+
+    /**
+     * Auto-detect if the HTTP middleware stack should be used.
+     *
+     * @return void
+     */
+    public function setUp()
+    {
+        parent::setUp();
+        $namespace = Configure::read('App.namespace');
+        $this->_useHttpServer = class_exists($namespace . '\Application');
+    }
+
+    /**
      * Clears the state used for requests.
      *
      * @return void
@@ -136,8 +179,38 @@ abstract class IntegrationTestCase extends TestCase
         $this->_viewName = null;
         $this->_layoutName = null;
         $this->_requestSession = null;
+        $this->_appClass = null;
+        $this->_appArgs = null;
         $this->_securityToken = false;
         $this->_csrfToken = false;
+        $this->_useHttpServer = false;
+    }
+
+    /**
+     * Toggle whether or not you want to use the HTTP Server stack.
+     *
+     * @param bool $enable Enable/disable the usage of the HTTP Stack.
+     * @return void
+     */
+    public function useHttpServer($enable)
+    {
+        $this->_useHttpServer = (bool)$enable;
+    }
+
+    /**
+     * Configure the application class to use in integration tests.
+     *
+     * Combined with `useHttpServer()` to customize the class name and constructor arguments
+     * of your application class.
+     *
+     * @param string $class The application class name.
+     * @param array|null $constructorArgs The constructor arguments for your application class.
+     * @return void
+     */
+    public function configApplication($class, $constructorArgs)
+    {
+        $this->_appClass = $class;
+        $this->_appArgs = $constructorArgs;
     }
 
     /**
@@ -216,6 +289,40 @@ abstract class IntegrationTestCase extends TestCase
     public function cookie($name, $value)
     {
         $this->_cookie[$name] = $value;
+    }
+
+    /**
+     * Returns the encryption key to be used.
+     *
+     * @return string
+     */
+    protected function _getCookieEncryptionKey()
+    {
+        if (isset($this->_cookieEncriptionKey)) {
+            return $this->_cookieEncriptionKey;
+        }
+
+        return Security::salt();
+    }
+
+    /**
+     * Sets a encrypted request cookie for future requests.
+     *
+     * The difference from cookie() is this encrypts the cookie
+     * value like the CookieComponent.
+     *
+     * @param string $name The cookie name to use.
+     * @param mixed $value The value of the cookie.
+     * @param string|bool $encrypt Encryption mode to use.
+     * @param string|null $key Encryption key used. Defaults
+     *   to Security.salt.
+     * @return void
+     * @see \Cake\Utility\CookieCryptTrait::_encrypt()
+     */
+    public function cookieEncrypted($name, $value, $encrypt = 'aes', $key = null)
+    {
+        $this->_cookieEncriptionKey = $key;
+        $this->_cookie[$name] = $this->_encrypt($value, $encrypt);
     }
 
     /**
@@ -309,21 +416,17 @@ abstract class IntegrationTestCase extends TestCase
      */
     protected function _sendRequest($url, $method, $data = [])
     {
-        $request = $this->_buildRequest($url, $method, $data);
-        $response = new Response();
-        $dispatcher = DispatcherFactory::create();
-        $dispatcher->eventManager()->on(
-            'Dispatcher.beforeDispatch',
-            ['priority' => 999],
-            [$this, 'controllerSpy']
-        );
+        $dispatcher = $this->_makeDispatcher();
         try {
-            $dispatcher->dispatch($request, $response);
-            $this->_requestSession = $request->session();
+            $request = $this->_buildRequest($url, $method, $data);
+            $response = $dispatcher->execute($request);
+            $this->_requestSession = $request['session'];
             $this->_response = $response;
         } catch (PHPUnit_Exception $e) {
             throw $e;
         } catch (DatabaseException $e) {
+            throw $e;
+        } catch (LogicException $e) {
             throw $e;
         } catch (Exception $e) {
             $this->_exception = $e;
@@ -332,18 +435,33 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
+     * Get the correct dispatcher instance.
+     *
+     * @return object A dispatcher instance
+     */
+    protected function _makeDispatcher()
+    {
+        if ($this->_useHttpServer) {
+            return new MiddlewareDispatcher($this, $this->_appClass, $this->_appArgs);
+        }
+
+        return new LegacyRequestDispatcher($this);
+    }
+
+    /**
      * Adds additional event spies to the controller/view event manager.
      *
      * @param \Cake\Event\Event $event A dispatcher event.
+     * @param \Cake\Controller\Controller|null $controller Controller instance.
      * @return void
      */
-    public function controllerSpy($event)
+    public function controllerSpy($event, $controller = null)
     {
-        if (empty($event->data['controller'])) {
-            return;
+        if (!$controller) {
+            $controller = $event->subject();
         }
-        $this->_controller = $event->data['controller'];
-        $events = $this->_controller->eventManager();
+        $this->_controller = $controller;
+        $events = $controller->eventManager();
         $events->on('View.beforeRender', function ($event, $viewFile) {
             if (!$this->_viewName) {
                 $this->_viewName = $viewFile;
@@ -380,7 +498,7 @@ abstract class IntegrationTestCase extends TestCase
      * @param string|array $url The URL
      * @param string $method The HTTP method
      * @param array|null $data The request data.
-     * @return \Cake\Network\Request The built request.
+     * @return array The request context
      */
     protected function _buildRequest($url, $method, $data)
     {
@@ -390,10 +508,15 @@ abstract class IntegrationTestCase extends TestCase
         $session = Session::create($sessionConfig);
         $session->write($this->_session);
         list ($url, $query) = $this->_url($url);
+        $tokenUrl = $url;
+
+        if ($query) {
+            $tokenUrl .= '?' . http_build_query($query);
+        }
 
         $props = [
             'url' => $url,
-            'post' => $this->_addTokens($url, $data),
+            'post' => $this->_addTokens($tokenUrl, $data),
             'cookies' => $this->_cookie,
             'session' => $session,
             'query' => $query
@@ -404,14 +527,19 @@ abstract class IntegrationTestCase extends TestCase
         $env = [];
         if (isset($this->_request['headers'])) {
             foreach ($this->_request['headers'] as $k => $v) {
-                $env['HTTP_' . str_replace('-', '_', strtoupper($k))] = $v;
+                $name = strtoupper(str_replace('-', '_', $k));
+                if (!in_array($name, ['CONTENT_LENGTH', 'CONTENT_TYPE'])) {
+                    $name = 'HTTP_' . $name;
+                }
+                $env[$name] = $v;
             }
             unset($this->_request['headers']);
         }
         $env['REQUEST_METHOD'] = $method;
         $props['environment'] = $env;
         $props = Hash::merge($props, $this->_request);
-        return new Request($props);
+
+        return $props;
     }
 
     /**
@@ -424,20 +552,23 @@ abstract class IntegrationTestCase extends TestCase
     protected function _addTokens($url, $data)
     {
         if ($this->_securityToken === true) {
-            $keys = Hash::flatten($data);
-            $tokenData = $this->_buildFieldToken($url, $keys);
+            $keys = array_map(function ($field) {
+                return preg_replace('/(\.\d+)+$/', '', $field);
+            }, array_keys(Hash::flatten($data)));
+            $tokenData = $this->_buildFieldToken($url, array_unique($keys));
             $data['_Token'] = $tokenData;
+            $data['_Token']['debug'] = 'SecurityComponent debug data would be added here';
         }
 
         if ($this->_csrfToken === true) {
-            $csrfToken = Text::uuid();
-            if (!isset($data['_csrfToken'])) {
-                $data['_csrfToken'] = $csrfToken;
-            }
             if (!isset($this->_cookie['csrfToken'])) {
-                $this->_cookie['csrfToken'] = $csrfToken;
+                $this->_cookie['csrfToken'] = Text::uuid();
+            }
+            if (!isset($data['_csrfToken'])) {
+                $data['_csrfToken'] = $this->_cookie['csrfToken'];
             }
         }
+
         return $data;
     }
 
@@ -476,6 +607,7 @@ abstract class IntegrationTestCase extends TestCase
         if (isset($this->_controller->viewVars[$name])) {
             return $this->_controller->viewVars[$name];
         }
+
         return null;
     }
 
@@ -506,7 +638,7 @@ abstract class IntegrationTestCase extends TestCase
      */
     public function assertResponseError()
     {
-        $this->_assertStatus(400, 417, 'Status code is not between 400 and 417');
+        $this->_assertStatus(400, 429, 'Status code is not between 400 and 429');
     }
 
     /**
@@ -571,6 +703,7 @@ abstract class IntegrationTestCase extends TestCase
         $result = $this->_response->header();
         if ($url === null) {
             $this->assertTrue(!empty($result['Location']), $message);
+
             return;
         }
         if (empty($result['Location'])) {
@@ -637,6 +770,26 @@ abstract class IntegrationTestCase extends TestCase
             $this->fail("The '$header' header is not set. " . $message);
         }
         $this->assertEquals($headers[$header], $content, $message);
+    }
+
+    /**
+     * Asserts response header contains a string
+     *
+     * @param string $header The header to check
+     * @param string $content The content to check for.
+     * @param string $message The failure message that will be appended to the generated message.
+     * @return void
+     */
+    public function assertHeaderContains($header, $content, $message = '')
+    {
+        if (!$this->_response) {
+            $this->fail('No response set, cannot assert headers. ' . $message);
+        }
+        $headers = $this->_response->header();
+        if (!isset($headers[$header])) {
+            $this->fail("The '$header' header is not set. " . $message);
+        }
+        $this->assertContains($content, $headers[$header], $message);
     }
 
     /**
@@ -775,7 +928,11 @@ abstract class IntegrationTestCase extends TestCase
             $this->fail('There is no stored session data. Perhaps you need to run a request?');
         }
         $result = $this->_requestSession->read($path);
-        $this->assertEquals($expected, $result, 'Session content differs. ' . $message);
+        $this->assertEquals(
+            $expected,
+            $result,
+            'Session content for "' . $path . '" differs. ' . $message
+        );
     }
 
     /**
@@ -792,6 +949,73 @@ abstract class IntegrationTestCase extends TestCase
             $this->fail('Not response set, cannot assert cookies.');
         }
         $result = $this->_response->cookie($name);
+        $this->assertEquals(
+            $expected,
+            $result['value'],
+            'Cookie "' . $name . '" data differs. ' . $message
+        );
+    }
+
+    /**
+     * Asserts a cookie has not been set in the response
+     *
+     * @param string $cookie The cookie name to check
+     * @param string $message The failure message that will be appended to the generated message.
+     * @return void
+     */
+    public function assertCookieNotSet($cookie, $message = '')
+    {
+        if (!$this->_response) {
+            $this->fail('No response set, cannot assert cookies. ' . $message);
+        }
+
+        $this->assertCookie(null, $cookie, "Cookie '{$cookie}' has been set. " . $message);
+    }
+
+    /**
+     * Asserts cookie values which are encrypted by the
+     * CookieComponent.
+     *
+     * The difference from assertCookie() is this decrypts the cookie
+     * value like the CookieComponent for this assertion.
+     *
+     * @param string $expected The expected contents.
+     * @param string $name The cookie name.
+     * @param string|bool $encrypt Encryption mode to use.
+     * @param string|null $key Encryption key used. Defaults
+     *   to Security.salt.
+     * @param string $message The failure message that will be appended to the generated message.
+     * @return void
+     * @see \Cake\Utility\CookieCryptTrait::_encrypt()
+     */
+    public function assertCookieEncrypted($expected, $name, $encrypt = 'aes', $key = null, $message = '')
+    {
+        if (empty($this->_response)) {
+            $this->fail('No response set, cannot assert cookies.');
+        }
+        $result = $this->_response->cookie($name);
+        $this->_cookieEncriptionKey = $key;
+        $result['value'] = $this->_decrypt($result['value'], $encrypt);
         $this->assertEquals($expected, $result['value'], 'Cookie data differs. ' . $message);
+    }
+
+    /**
+     * Asserts that a file with the given name was sent in the response
+     *
+     * @param string $expected The file name that should be sent in the response
+     * @param string $message The failure message that will be appended to the generated message.
+     * @return void
+     */
+    public function assertFileResponse($expected, $message = '')
+    {
+        if ($this->_response === null) {
+            $this->fail('No response set, cannot assert file.');
+        }
+        $actual = isset($this->_response->getFile()->path) ? $this->_response->getFile()->path : null;
+
+        if ($actual === null) {
+            $this->fail('No file was sent in this response');
+        }
+        $this->assertEquals($expected, $actual, $message);
     }
 }

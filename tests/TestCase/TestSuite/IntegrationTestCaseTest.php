@@ -21,6 +21,7 @@ use Cake\Routing\DispatcherFactory;
 use Cake\Routing\Router;
 use Cake\TestSuite\IntegrationTestCase;
 use Cake\Test\Fixture\AssertIntegrationTestCase;
+use Cake\Utility\Security;
 
 /**
  * Self test of the IntegrationTestCase
@@ -42,6 +43,7 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         DispatcherFactory::clear();
         DispatcherFactory::add('Routing');
         DispatcherFactory::add('ControllerFactory');
+        $this->useHttpServer(false);
     }
 
     /**
@@ -52,7 +54,11 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     public function testRequestBuilding()
     {
         $this->configRequest([
-            'headers' => ['X-CSRF-Token' => 'abc123'],
+            'headers' => [
+                'X-CSRF-Token' => 'abc123',
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ],
             'base' => '',
             'webroot' => '/',
             'environment' => [
@@ -64,13 +70,14 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $this->session(['User' => ['id' => 1, 'username' => 'mark']]);
         $request = $this->_buildRequest('/tasks/add', 'POST', ['title' => 'First post']);
 
-        $this->assertEquals('abc123', $request->header('X-CSRF-Token'));
-        $this->assertEquals('tasks/add', $request->url);
-        $this->assertArrayHasKey('split_token', $request->cookies);
-        $this->assertEquals('def345', $request->cookies['split_token']);
-        $this->assertEquals(['id' => '1', 'username' => 'mark'], $request->session()->read('User'));
-        $this->assertEquals('foo', $request->env('PHP_AUTH_USER'));
-        $this->assertEquals('bar', $request->env('PHP_AUTH_PW'));
+        $this->assertEquals('abc123', $request['environment']['HTTP_X_CSRF_TOKEN']);
+        $this->assertEquals('application/json', $request['environment']['CONTENT_TYPE']);
+        $this->assertEquals('/tasks/add', $request['url']);
+        $this->assertArrayHasKey('split_token', $request['cookies']);
+        $this->assertEquals('def345', $request['cookies']['split_token']);
+        $this->assertEquals(['id' => '1', 'username' => 'mark'], $request['session']->read('User'));
+        $this->assertEquals('foo', $request['environment']['PHP_AUTH_USER']);
+        $this->assertEquals('bar', $request['environment']['PHP_AUTH_PW']);
     }
 
     /**
@@ -83,9 +90,9 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $this->enableCsrfToken();
         $request = $this->_buildRequest('/tasks/add', 'POST', ['title' => 'First post']);
 
-        $this->assertArrayHasKey('csrfToken', $request->cookies);
-        $this->assertArrayHasKey('_csrfToken', $request->data);
-        $this->assertSame($request->cookies['csrfToken'], $request->data['_csrfToken']);
+        $this->assertArrayHasKey('csrfToken', $request['cookies']);
+        $this->assertArrayHasKey('_csrfToken', $request['post']);
+        $this->assertSame($request['cookies']['csrfToken'], $request['post']['_csrfToken']);
 
         $this->cookie('csrfToken', '');
         $request = $this->_buildRequest('/tasks/add', 'POST', [
@@ -93,8 +100,45 @@ class IntegrationTestCaseTest extends IntegrationTestCase
             'title' => 'First post'
         ]);
 
-        $this->assertSame('', $request->cookies['csrfToken']);
-        $this->assertSame('fale', $request->data['_csrfToken']);
+        $this->assertSame('', $request['cookies']['csrfToken']);
+        $this->assertSame('fale', $request['post']['_csrfToken']);
+    }
+
+    /**
+     * Test multiple actions using CSRF tokens don't fail
+     *
+     * @return void
+     */
+    public function testEnableCsrfMultipleRequests()
+    {
+        $this->enableCsrfToken();
+        $first = $this->_buildRequest('/tasks/add', 'POST', ['title' => 'First post']);
+        $second = $this->_buildRequest('/tasks/add', 'POST', ['title' => 'Second post']);
+        $this->assertSame(
+            $first['cookies']['csrfToken'],
+            $second['post']['_csrfToken'],
+            'Csrf token should match cookie'
+        );
+        $this->assertSame(
+            $first['post']['_csrfToken'],
+            $second['post']['_csrfToken'],
+            'Tokens should be consistent per test method'
+        );
+    }
+
+    /**
+     * Test pre-determined CSRF tokens.
+     *
+     * @return void
+     */
+    public function testEnableCsrfPredeterminedCookie()
+    {
+        $this->enableCsrfToken();
+        $value = 'I am a teapot';
+        $this->cookie('csrfToken', $value);
+        $request = $this->_buildRequest('/tasks/add', 'POST', ['title' => 'First post']);
+        $this->assertSame($value, $request['cookies']['csrfToken'], 'Csrf token should match cookie');
+        $this->assertSame($value, $request['post']['_csrfToken'], 'Tokens should match');
     }
 
     /**
@@ -106,8 +150,21 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     {
         $request = $this->_buildRequest('/tasks/view?archived=yes', 'GET', []);
 
-        $this->assertEquals('/tasks/view?archived=yes', $request->here());
-        $this->assertEquals('yes', $request->query('archived'));
+        $this->assertEquals('/tasks/view', $request['url']);
+        $this->assertEquals('yes', $request['query']['archived']);
+    }
+
+    /**
+     * Test cookie encrypted
+     *
+     * @see CookieComponentControllerTest
+     */
+    public function testCookieEncrypted()
+    {
+        Security::salt('abcdabcdabcdabcdabcdabcdabcdabcdabcd');
+        $this->cookieEncrypted('KeyOfCookie', 'Encrypted with aes by default');
+        $request = $this->_buildRequest('/tasks/view', 'GET', []);
+        $this->assertStringStartsWith('Q2FrZQ==.', $request['cookies']['KeyOfCookie']);
     }
 
     /**
@@ -126,6 +183,117 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     }
 
     /**
+     * Test customizing the app class.
+     *
+     * @expectedException \LogicException
+     * @expectedExceptionMessage Cannot load "TestApp\MissingApp" for use in integration
+     * @return void
+     */
+    public function testConfigApplication()
+    {
+        DispatcherFactory::clear();
+        $this->useHttpServer(true);
+        $this->configApplication('TestApp\MissingApp', []);
+        $this->get('/request_action/test_request_action');
+    }
+
+    /**
+     * Test sending get requests with Http\Server
+     *
+     * @return void
+     */
+    public function testGetHttpServer()
+    {
+        DispatcherFactory::clear();
+        $this->useHttpServer(true);
+        $this->assertNull($this->_response);
+
+        $this->get('/request_action/test_request_action');
+        $this->assertNotEmpty($this->_response);
+        $this->assertInstanceOf('Cake\Network\Response', $this->_response);
+        $this->assertEquals('This is a test', $this->_response->body());
+        $this->assertHeader('X-Middleware', 'true');
+    }
+
+    /**
+     * Test that the PSR7 requests get query string data
+     *
+     * @return void
+     */
+    public function testQueryStringHttpServer()
+    {
+        $this->useHttpServer(true);
+
+        $this->configRequest(['headers' => ['Content-Type' => 'text/plain']]);
+        $this->get('/request_action/params_pass?q=query');
+        $this->assertResponseOk();
+        $this->assertResponseContains('"q":"query"');
+        $this->assertResponseContains('"contentType":"text\/plain"');
+        $this->assertHeader('X-Middleware', 'true');
+    }
+
+    /**
+     * Test that the PSR7 requests get cookies
+     *
+     * @return void
+     */
+    public function testGetCookiesHttpServer()
+    {
+        $this->useHttpServer(true);
+
+        $this->configRequest(['cookies' => ['split_test' => 'abc']]);
+        $this->get('/request_action/cookie_pass');
+        $this->assertResponseOk();
+        $this->assertResponseContains('"split_test":"abc"');
+        $this->assertHeader('X-Middleware', 'true');
+    }
+
+    /**
+     * Test that the PSR7 requests receive post data
+     *
+     * @return void
+     */
+    public function testPostDataHttpServer()
+    {
+        $this->useHttpServer(true);
+
+        $this->post('/request_action/post_pass', ['title' => 'value']);
+        $data = json_decode($this->_response->body());
+        $this->assertEquals('value', $data->title);
+        $this->assertHeader('X-Middleware', 'true');
+    }
+
+    /**
+     * Test that the PSR7 requests receive encoded data.
+     *
+     * @return void
+     */
+    public function testInputDataHttpServer()
+    {
+        $this->useHttpServer(true);
+
+        $this->post('/request_action/input_test', '{"hello":"world"}');
+        $this->assertSame('world', $this->_response->body());
+        $this->assertHeader('X-Middleware', 'true');
+    }
+
+    /**
+     * Test that the PSR7 requests get cookies
+     *
+     * @return void
+     */
+    public function testSessionHttpServer()
+    {
+        $this->useHttpServer(true);
+
+        $this->session(['foo' => 'session data']);
+        $this->get('/request_action/session_test');
+        $this->assertResponseOk();
+        $this->assertResponseContains('session data');
+        $this->assertHeader('X-Middleware', 'true');
+    }
+
+    /**
      * Test sending requests stores references to controller/view/layout.
      *
      * @return void
@@ -134,7 +302,31 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     {
         $this->post('/posts/index');
         $this->assertInstanceOf('Cake\Controller\Controller', $this->_controller);
+        $this->assertNotEmpty($this->_viewName, 'View name not set');
         $this->assertContains('Template' . DS . 'Posts' . DS . 'index.ctp', $this->_viewName);
+        $this->assertNotEmpty($this->_layoutName, 'Layout name not set');
+        $this->assertContains('Template' . DS . 'Layout' . DS . 'default.ctp', $this->_layoutName);
+
+        $this->assertTemplate('index');
+        $this->assertLayout('default');
+        $this->assertEquals('value', $this->viewVariable('test'));
+    }
+
+    /**
+     * Test PSR7 requests store references to controller/view/layout
+     *
+     * @return void
+     */
+    public function testRequestSetsPropertiesHttpServer()
+    {
+        $this->useHttpServer(true);
+        DispatcherFactory::clear();
+
+        $this->post('/posts/index');
+        $this->assertInstanceOf('Cake\Controller\Controller', $this->_controller);
+        $this->assertNotEmpty($this->_viewName, 'View name not set');
+        $this->assertContains('Template' . DS . 'Posts' . DS . 'index.ctp', $this->_viewName);
+        $this->assertNotEmpty($this->_layoutName, 'Layout name not set');
         $this->assertContains('Template' . DS . 'Layout' . DS . 'default.ctp', $this->_layoutName);
 
         $this->assertTemplate('index');
@@ -177,6 +369,48 @@ class IntegrationTestCaseTest extends IntegrationTestCase
 
         $this->assertSession('An error message', 'Flash.flash.0.message');
         $this->assertCookie(1, 'remember_me');
+        $this->assertCookieNotSet('user_id');
+    }
+
+    /**
+     * Test flash and cookie assertions
+     *
+     * @return void
+     */
+    public function testFlashSessionAndCookieAssertsHttpServer()
+    {
+        $this->useHttpServer(true);
+        $this->post('/posts/index');
+
+        $this->assertSession('An error message', 'Flash.flash.0.message');
+        $this->assertCookieNotSet('user_id');
+        $this->assertCookie(1, 'remember_me');
+    }
+
+    /**
+     * Tests the failure message for assertCookieNotSet
+     *
+     * @expectedException \PHPUnit_Framework_AssertionFailedError
+     * @expectedExceptionMessage Cookie 'remember_me' has been set
+     * @return void
+     */
+    public function testCookieNotSetFailure()
+    {
+        $this->post('/posts/index');
+        $this->assertCookieNotSet('remember_me');
+    }
+
+    /**
+     * Tests the failure message for assertCookieNotSet when no
+     * response whas generated
+     *
+     * @expectedException \PHPUnit_Framework_AssertionFailedError
+     * @expectedExceptionMessage No response set, cannot assert cookies.
+     * @return void
+     */
+    public function testCookieNotSetFailureNoResponse()
+    {
+        $this->assertCookieNotSet('remember_me');
     }
 
     /**
@@ -193,7 +427,7 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     }
 
     /**
-     * Test posting to a secured form action action.
+     * Test posting to a secured form action.
      *
      * @return void
      */
@@ -205,6 +439,43 @@ class IntegrationTestCaseTest extends IntegrationTestCase
             'body' => 'Some text'
         ];
         $this->post('/posts/securePost', $data);
+        $this->assertResponseOk();
+        $this->assertResponseContains('Request was accepted');
+    }
+
+    /**
+     * Test posting to a secured form action with nested data.
+     *
+     * @return void
+     */
+    public function testPostSecuredFormNestedData()
+    {
+        $this->enableSecurityToken();
+        $data = [
+            'title' => 'New post',
+            'comments' => [
+                ['comment' => 'A new comment']
+            ],
+            'tags' => ['_ids' => [1, 2, 3, 4]]
+        ];
+        $this->post('/posts/securePost', $data);
+        $this->assertResponseOk();
+        $this->assertResponseContains('Request was accepted');
+    }
+
+    /**
+     * Test posting to a secured form action.
+     *
+     * @return void
+     */
+    public function testPostSecuredFormWithQuery()
+    {
+        $this->enableSecurityToken();
+        $data = [
+            'title' => 'Some title',
+            'body' => 'Some text'
+        ];
+        $this->post('/posts/securePost?foo=bar', $data);
         $this->assertResponseOk();
         $this->assertResponseContains('Request was accepted');
     }
@@ -236,9 +507,23 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     }
 
     /**
+     * Test that exceptions being thrown are handled correctly by the psr7 stack.
+     *
+     * @return void
+     */
+    public function testWithExpectedExceptionHttpServer()
+    {
+        DispatcherFactory::clear();
+        $this->useHttpServer(true);
+
+        $this->get('/tests_apps/throw_exception');
+        $this->assertResponseCode(500);
+    }
+
+    /**
      * Test that exceptions being thrown are handled correctly.
      *
-     * @expectedException PHPUnit_Framework_AssertionFailedError
+     * @expectedException \PHPUnit_Framework_AssertionFailedError
      * @return void
      */
     public function testWithUnexpectedException()
@@ -257,6 +542,21 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $this->post('/tests_apps/redirect_to');
         $this->assertResponseSuccess();
         $this->assertResponseCode(302);
+    }
+
+    /**
+     * Test redirecting and psr7 stack
+     *
+     * @return void
+     */
+    public function testRedirectHttpServer()
+    {
+        DispatcherFactory::clear();
+        $this->useHttpServer(true);
+
+        $this->post('/tests_apps/redirect_to');
+        $this->assertResponseCode(302);
+        $this->assertHeader('X-Middleware', 'true');
     }
 
     /**
@@ -349,7 +649,7 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     {
         $test = new AssertIntegrationTestCase('testBadAssertNoRedirect');
         $result = $test->run();
-        ob_start();
+
         $this->assertFalse($result->wasSuccessful());
         $this->assertEquals(1, $result->failureCount());
     }
@@ -378,6 +678,19 @@ class IntegrationTestCaseTest extends IntegrationTestCase
         $this->_response->header('Etag', 'abc123');
 
         $this->assertHeader('Etag', 'abc123');
+    }
+
+    /**
+     * Test the header contains assertion.
+     *
+     * @return void
+     */
+    public function testAssertHeaderContains()
+    {
+        $this->_response = new Response();
+        $this->_response->header('Etag', 'abc123');
+
+        $this->assertHeaderContains('Etag', 'abc');
     }
 
     /**
@@ -456,5 +769,55 @@ class IntegrationTestCaseTest extends IntegrationTestCase
     public function testEventManagerReset2($prevEventManager)
     {
         $this->assertNotSame($prevEventManager, EventManager::instance());
+    }
+
+    /**
+     * Test sending file in requests.
+     *
+     * @return void
+     */
+    public function testSendFile()
+    {
+        $this->get('/posts/file');
+        $this->assertFileResponse(TEST_APP . 'TestApp' . DS . 'Controller' . DS . 'PostsController.php');
+    }
+
+    /**
+     * Test sending file with psr7 stack
+     *
+     * @return void
+     */
+    public function testSendFileHttpServer()
+    {
+        DispatcherFactory::clear();
+        $this->useHttpServer(true);
+
+        $this->get('/posts/file');
+        $this->assertFileResponse(TEST_APP . 'TestApp' . DS . 'Controller' . DS . 'PostsController.php');
+    }
+
+    /**
+     * Test that assertFile requires a response
+     *
+     * @expectedException \PHPUnit_Framework_AssertionFailedError
+     * @expectedExceptionMessage No response set, cannot assert file
+     * @return void
+     */
+    public function testAssertFileNoReponse()
+    {
+        $this->assertFileResponse('foo');
+    }
+
+    /**
+     * Test that assertFile requires a file
+     *
+     * @expectedException \PHPUnit_Framework_AssertionFailedError
+     * @expectedExceptionMessage No file was sent in this response
+     * @return void
+     */
+    public function testAssertFileNoFile()
+    {
+        $this->get('/posts/get');
+        $this->assertFileResponse('foo');
     }
 }

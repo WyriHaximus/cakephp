@@ -14,12 +14,13 @@
  */
 namespace Cake\Test\TestCase\Database\Schema;
 
-use Cake\Core\Configure;
+use Cake\Database\Driver\Sqlserver;
 use Cake\Database\Schema\Collection as SchemaCollection;
 use Cake\Database\Schema\SqlserverSchema;
 use Cake\Database\Schema\Table;
 use Cake\Datasource\ConnectionManager;
 use Cake\TestSuite\TestCase;
+use PDO;
 
 /**
  * SQL Server schema test case.
@@ -62,12 +63,15 @@ SQL;
         $table = <<<SQL
 CREATE TABLE schema_articles (
 id BIGINT PRIMARY KEY,
-title VARCHAR(20),
-body VARCHAR(1000),
+title NVARCHAR(20) COLLATE Japanese_Unicode_CI_AI DEFAULT N'無題' COLLATE Japanese_Unicode_CI_AI,
+body NVARCHAR(1000) DEFAULT N'本文なし',
 author_id INTEGER NOT NULL,
 published BIT DEFAULT 0,
 views SMALLINT DEFAULT 0,
 created DATETIME,
+field1 VARCHAR(10) DEFAULT NULL,
+field2 VARCHAR(10) DEFAULT 'NULL',
+field3 VARCHAR(10) DEFAULT 'O''hare',
 CONSTRAINT [content_idx] UNIQUE ([title], [body]),
 CONSTRAINT [author_idx] FOREIGN KEY ([author_id]) REFERENCES [schema_authors] ([id]) ON DELETE CASCADE ON UPDATE CASCADE
 )
@@ -235,17 +239,21 @@ SQL;
             'default' => 'Default value',
             'char_length' => $length,
             'precision' => $precision,
-            'scale' => $scale
+            'scale' => $scale,
+            'collation_name' => 'Japanese_Unicode_CI_AI',
         ];
         $expected += [
             'null' => true,
             'default' => 'Default value',
+            'collate' => 'Japanese_Unicode_CI_AI',
         ];
 
-        $driver = $this->getMock('Cake\Database\Driver\Sqlserver');
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlserver')->getMock();
         $dialect = new SqlserverSchema($driver);
 
-        $table = $this->getMock('Cake\Database\Schema\Table', [], ['table']);
+        $table = $this->getMockBuilder('Cake\Database\Schema\Table')
+            ->setConstructorArgs(['table'])
+            ->getMock();
         $table->expects($this->at(0))->method('addColumn')->with('field', $expected);
 
         $dialect->convertColumnDescription($table, $field);
@@ -294,20 +302,22 @@ SQL;
             'title' => [
                 'type' => 'string',
                 'null' => true,
-                'default' => null,
-                'length' => 20,
+                'default' => '無題',
+                'length' => 40,
                 'precision' => null,
                 'comment' => null,
                 'fixed' => null,
+                'collate' => 'Japanese_Unicode_CI_AI',
             ],
             'body' => [
                 'type' => 'string',
                 'null' => true,
-                'default' => null,
-                'length' => 1000,
+                'default' => '本文なし',
+                'length' => 2000,
                 'precision' => null,
                 'fixed' => null,
                 'comment' => null,
+                'collate' => 'SQL_Latin1_General_CP1_CI_AS',
             ],
             'author_id' => [
                 'type' => 'integer',
@@ -344,6 +354,36 @@ SQL;
                 'length' => null,
                 'precision' => null,
                 'comment' => null,
+            ],
+            'field1' => [
+                'type' => 'string',
+                'null' => true,
+                'default' => null,
+                'length' => 10,
+                'precision' => null,
+                'fixed' => null,
+                'comment' => null,
+                'collate' => 'SQL_Latin1_General_CP1_CI_AS',
+            ],
+            'field2' => [
+                'type' => 'string',
+                'null' => true,
+                'default' => 'NULL',
+                'length' => 10,
+                'precision' => null,
+                'fixed' => null,
+                'comment' => null,
+                'collate' => 'SQL_Latin1_General_CP1_CI_AS',
+            ],
+            'field3' => [
+                'type' => 'string',
+                'null' => true,
+                'default' => 'O\'hare',
+                'length' => 10,
+                'precision' => null,
+                'fixed' => null,
+                'comment' => null,
+                'collate' => 'SQL_Latin1_General_CP1_CI_AS',
             ],
         ];
         $this->assertEquals(['id'], $result->primaryKey());
@@ -474,18 +514,43 @@ SQL;
             [
                 'role',
                 ['type' => 'string', 'length' => 10, 'null' => false, 'default' => 'admin'],
-                "[role] NVARCHAR(10) NOT NULL DEFAULT [admin]"
+                "[role] NVARCHAR(10) NOT NULL DEFAULT 'admin'"
             ],
             [
                 'title',
                 ['type' => 'string'],
                 '[title] NVARCHAR(255)'
             ],
+            [
+                'title',
+                ['type' => 'string', 'length' => 25, 'null' => false, 'collate' => 'Japanese_Unicode_CI_AI'],
+                '[title] NVARCHAR(25) COLLATE Japanese_Unicode_CI_AI NOT NULL'
+            ],
             // Text
             [
                 'body',
                 ['type' => 'text', 'null' => false],
                 '[body] NVARCHAR(MAX) NOT NULL'
+            ],
+            [
+                'body',
+                ['type' => 'text', 'length' => Table::LENGTH_TINY, 'null' => false],
+                sprintf('[body] NVARCHAR(%s) NOT NULL', Table::LENGTH_TINY)
+            ],
+            [
+                'body',
+                ['type' => 'text', 'length' => Table::LENGTH_MEDIUM, 'null' => false],
+                '[body] NVARCHAR(MAX) NOT NULL'
+            ],
+            [
+                'body',
+                ['type' => 'text', 'length' => Table::LENGTH_LONG, 'null' => false],
+                '[body] NVARCHAR(MAX) NOT NULL'
+            ],
+            [
+                'body',
+                ['type' => 'text', 'null' => false, 'collate' => 'Japanese_Unicode_CI_AI'],
+                '[body] NVARCHAR(MAX) COLLATE Japanese_Unicode_CI_AI NOT NULL'
             ],
             // Integers
             [
@@ -528,7 +593,22 @@ SQL;
             // Binary
             [
                 'img',
-                ['type' => 'binary'],
+                ['type' => 'binary', 'length' => null],
+                '[img] VARBINARY(MAX)'
+            ],
+            [
+                'img',
+                ['type' => 'binary', 'length' => Table::LENGTH_TINY],
+                sprintf('[img] VARBINARY(%s)', Table::LENGTH_TINY)
+            ],
+            [
+                'img',
+                ['type' => 'binary', 'length' => Table::LENGTH_MEDIUM],
+                '[img] VARBINARY(MAX)'
+            ],
+            [
+                'img',
+                ['type' => 'binary', 'length' => Table::LENGTH_LONG],
                 '[img] VARBINARY(MAX)'
             ],
             // Boolean
@@ -655,6 +735,108 @@ SQL;
     }
 
     /**
+     * Test the addConstraintSql method.
+     *
+     * @return void
+     */
+    public function testAddConstraintSql()
+    {
+        $driver = $this->_getMockedDriver();
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $connection->expects($this->any())->method('driver')
+            ->will($this->returnValue($driver));
+
+        $table = (new Table('posts'))
+            ->addColumn('author_id', [
+                'type' => 'integer',
+                'null' => false
+            ])
+            ->addColumn('category_id', [
+                'type' => 'integer',
+                'null' => false
+            ])
+            ->addColumn('category_name', [
+                'type' => 'integer',
+                'null' => false
+            ])
+            ->addConstraint('author_fk', [
+                'type' => 'foreign',
+                'columns' => ['author_id'],
+                'references' => ['authors', 'id'],
+                'update' => 'cascade',
+                'delete' => 'cascade'
+            ])
+            ->addConstraint('category_fk', [
+                'type' => 'foreign',
+                'columns' => ['category_id', 'category_name'],
+                'references' => ['categories', ['id', 'name']],
+                'update' => 'cascade',
+                'delete' => 'cascade'
+            ]);
+
+        $expected = [
+            'ALTER TABLE [posts] ADD CONSTRAINT [author_fk] FOREIGN KEY ([author_id]) REFERENCES [authors] ([id]) ON UPDATE CASCADE ON DELETE CASCADE;',
+            'ALTER TABLE [posts] ADD CONSTRAINT [category_fk] FOREIGN KEY ([category_id], [category_name]) REFERENCES [categories] ([id], [name]) ON UPDATE CASCADE ON DELETE CASCADE;'
+        ];
+        $result = $table->addConstraintSql($connection);
+        $this->assertCount(2, $result);
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
+     * Test the dropConstraintSql method.
+     *
+     * @return void
+     */
+    public function testDropConstraintSql()
+    {
+        $driver = $this->_getMockedDriver();
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $connection->expects($this->any())->method('driver')
+            ->will($this->returnValue($driver));
+
+        $table = (new Table('posts'))
+            ->addColumn('author_id', [
+                'type' => 'integer',
+                'null' => false
+            ])
+            ->addColumn('category_id', [
+                'type' => 'integer',
+                'null' => false
+            ])
+            ->addColumn('category_name', [
+                'type' => 'integer',
+                'null' => false
+            ])
+            ->addConstraint('author_fk', [
+                'type' => 'foreign',
+                'columns' => ['author_id'],
+                'references' => ['authors', 'id'],
+                'update' => 'cascade',
+                'delete' => 'cascade'
+            ])
+            ->addConstraint('category_fk', [
+                'type' => 'foreign',
+                'columns' => ['category_id', 'category_name'],
+                'references' => ['categories', ['id', 'name']],
+                'update' => 'cascade',
+                'delete' => 'cascade'
+            ]);
+
+        $expected = [
+            'ALTER TABLE [posts] DROP CONSTRAINT [author_fk];',
+            'ALTER TABLE [posts] DROP CONSTRAINT [category_fk];'
+        ];
+        $result = $table->dropConstraintSql($connection);
+        $this->assertCount(2, $result);
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
      * Integration test for converting a Schema\Table into MySQL table creates.
      *
      * @return void
@@ -662,7 +844,9 @@ SQL;
     public function testCreateSql()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
@@ -675,6 +859,14 @@ SQL;
                 'null' => false,
             ])
             ->addColumn('body', ['type' => 'text'])
+            ->addColumn('data', ['type' => 'json'])
+            ->addColumn('hash', [
+                'type' => 'string',
+                'fixed' => true,
+                'length' => 40,
+                'collate' => 'Latin1_General_BIN',
+                'null' => false,
+            ])
             ->addColumn('created', 'datetime')
             ->addConstraint('primary', [
                 'type' => 'primary',
@@ -690,6 +882,8 @@ CREATE TABLE [schema_articles] (
 [id] INTEGER IDENTITY(1, 1),
 [title] NVARCHAR(255) NOT NULL,
 [body] NVARCHAR(MAX),
+[data] NVARCHAR(MAX),
+[hash] NCHAR(40) COLLATE Latin1_General_BIN NOT NULL,
 [created] DATETIME,
 PRIMARY KEY ([id])
 )
@@ -712,7 +906,9 @@ SQL;
     public function testDropSql()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
@@ -730,7 +926,9 @@ SQL;
     public function testTruncateSql()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
@@ -743,29 +941,32 @@ SQL;
         $result = $table->truncateSql($connection);
         $this->assertCount(2, $result);
         $this->assertEquals('DELETE FROM [schema_articles]', $result[0]);
-        $this->assertEquals('DBCC CHECKIDENT([schema_articles], RESEED, 0)', $result[1]);
+        $this->assertEquals("DBCC CHECKIDENT('schema_articles', RESEED, 0)", $result[1]);
     }
 
     /**
      * Get a schema instance with a mocked driver/pdo instances
      *
-     * @return Driver
+     * @return \Cake\Database\Driver
      */
     protected function _getMockedDriver()
     {
-        $driver = new \Cake\Database\Driver\Sqlserver();
-        $mock = $this->getMock('FakePdo', ['quote', 'quoteIdentifier']);
+        $driver = new Sqlserver();
+        $pdo = PDO::class;
+        if (version_compare(PHP_VERSION, '5.6', '<')) {
+            $pdo = 'FakePdo';
+        }
+        $mock = $this->getMockBuilder($pdo)
+            ->setMethods(['quote'])
+            ->disableOriginalConstructor()
+            ->getMock();
         $mock->expects($this->any())
             ->method('quote')
             ->will($this->returnCallback(function ($value) {
-                return '[' . $value . ']';
-            }));
-        $mock->expects($this->any())
-            ->method('quoteIdentifier')
-            ->will($this->returnCallback(function ($value) {
-                return '[' . $value . ']';
+                return "'$value'";
             }));
         $driver->connection($mock);
+
         return $driver;
     }
 }

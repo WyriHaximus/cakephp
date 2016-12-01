@@ -19,7 +19,6 @@ use Cake\TestSuite\TestCase;
 
 /**
  * PluralRules tests
- *
  */
 class PluralRulesTest extends TestCase
 {
@@ -54,6 +53,10 @@ class PluralRulesTest extends TestCase
             ['ru', 0, 2],
             ['ru', 1, 0],
             ['ru', 2, 1],
+            ['ru', 21, 0],
+            ['ru', 22, 1],
+            ['ru', 5, 2],
+            ['ru', 7, 2],
             ['sk', 0, 2],
             ['sk', 1, 0],
             ['sk', 2, 1],

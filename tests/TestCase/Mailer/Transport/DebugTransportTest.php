@@ -16,13 +16,11 @@
  */
 namespace Cake\Test\TestCase\Mailer\Transport;
 
-use Cake\Mailer\Email;
 use Cake\Mailer\Transport\DebugTransport;
 use Cake\TestSuite\TestCase;
 
 /**
  * Test case
- *
  */
 class DebugTransportTest extends TestCase
 {
@@ -45,7 +43,9 @@ class DebugTransportTest extends TestCase
      */
     public function testSend()
     {
-        $email = $this->getMock('Cake\Mailer\Email', ['message']);
+        $email = $this->getMockBuilder('Cake\Mailer\Email')
+            ->setMethods(['message'])
+            ->getMock();
         $email->from('noreply@cakephp.org', 'CakePHP Test');
         $email->to('cake@cakephp.org', 'CakePHP');
         $email->cc(['mark@cakephp.org' => 'Mark Story', 'juan@cakephp.org' => 'Juan Basso']);

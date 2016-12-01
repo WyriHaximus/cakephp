@@ -21,7 +21,6 @@ use Cake\Utility\Security;
 
 /**
  * SecurityTest class
- *
  */
 class SecurityTest extends TestCase
 {
@@ -77,7 +76,7 @@ class SecurityTest extends TestCase
      */
     public function testRijndael()
     {
-        $this->skipIf(!function_exists('mcrypt_encrypt'));
+        $this->skipIf(!function_exists('mcrypt_encrypt') || version_compare(PHP_VERSION, '7.1', '>='));
         $engine = Security::engine();
 
         Security::engine(new Mcrypt());
@@ -260,7 +259,7 @@ class SecurityTest extends TestCase
      */
     public function testEngineEquivalence()
     {
-        $this->skipIf(!defined('MCRYPT_RIJNDAEL_128'), 'This needs mcrypt extension to be loaded.');
+        $this->skipIf(!function_exists('mcrypt_encrypt') || version_compare(PHP_VERSION, '7.1', '>='), 'This needs mcrypt extension to be loaded.');
 
         $restore = Security::engine();
         $txt = "Obi-wan you're our only hope";
@@ -291,5 +290,37 @@ class SecurityTest extends TestCase
     {
         Security::salt('foobarbaz');
         $this->assertEquals('foobarbaz', Security::salt());
+    }
+
+    /**
+     * Test the randomBytes method.
+     *
+     * @return void
+     */
+    public function testRandomBytes()
+    {
+        $value = Security::randomBytes(16);
+        $this->assertSame(16, strlen($value));
+
+        $value = Security::randomBytes(64);
+        $this->assertSame(64, strlen($value));
+
+        $this->assertRegExp('/[^0-9a-f]/', $value, 'should return a binary string');
+    }
+
+    /**
+     * Test the insecureRandomBytes method
+     *
+     * @return void
+     */
+    public function testInsecureRandomBytes()
+    {
+        $value = Security::insecureRandomBytes(16);
+        $this->assertSame(16, strlen($value));
+
+        $value = Security::insecureRandomBytes(64);
+        $this->assertSame(64, strlen($value));
+
+        $this->assertRegExp('/[^0-9a-f]/', $value, 'should return a binary string');
     }
 }

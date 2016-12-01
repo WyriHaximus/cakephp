@@ -168,6 +168,7 @@ class StatementDecorator implements StatementInterface, Countable, IteratorAggre
     public function execute($params = null)
     {
         $this->_hasExecuted = true;
+
         return $this->_statement->execute($params);
     }
 
@@ -185,7 +186,7 @@ class StatementDecorator implements StatementInterface, Countable, IteratorAggre
      * ```
      *
      * @param string $type 'num' for positional columns, assoc for named columns
-     * @return mixed Result array containing columns and values or false if no results
+     * @return array|false Result array containing columns and values or false if no results
      * are left
      */
     public function fetch($type = 'num')
@@ -205,7 +206,7 @@ class StatementDecorator implements StatementInterface, Countable, IteratorAggre
      * ```
      *
      * @param string $type num for fetching columns as positional keys or assoc for column names as keys
-     * @return array list of all results from database for this statement
+     * @return array List of all results from database for this statement
      */
     public function fetchAll($type = 'num')
     {
@@ -250,6 +251,7 @@ class StatementDecorator implements StatementInterface, Countable, IteratorAggre
         if (!$this->_hasExecuted) {
             $this->execute();
         }
+
         return $this->_statement;
     }
 
@@ -307,6 +309,7 @@ class StatementDecorator implements StatementInterface, Countable, IteratorAggre
         if (isset($row[$column])) {
             return $row[$column];
         }
+
         return $this->_driver->lastInsertId($table, $column);
     }
 

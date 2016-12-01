@@ -15,14 +15,12 @@
 namespace Cake\Test\TestCase\ORM;
 
 use Cake\ORM\Association;
-use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
 
 /**
  * Tests the features related to proxying methods from the Association
  * class to the Table class
- *
  */
 class AssociationProxyTest extends TestCase
 {
@@ -146,7 +144,9 @@ class AssociationProxyTest extends TestCase
     public function testAssociationMethodProxy()
     {
         $articles = TableRegistry::get('articles');
-        $mock = $this->getMock('Cake\ORM\Table', ['crazy']);
+        $mock = $this->getMockBuilder('Cake\ORM\Table')
+            ->setMethods(['crazy'])
+            ->getMock();
         $articles->belongsTo('authors', [
             'targetTable' => $mock
         ]);

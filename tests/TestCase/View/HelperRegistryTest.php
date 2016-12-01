@@ -14,7 +14,6 @@
  */
 namespace Cake\Test\TestCase\View;
 
-use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\TestSuite\TestCase;
@@ -34,11 +33,15 @@ class HtmlAliasHelper extends Helper
 }
 
 /**
- * Class HelperRegistryTest
- *
+ * HelperRegistryTest
  */
 class HelperRegistryTest extends TestCase
 {
+
+    /**
+     * @var \Cake\View\HelperRegistry
+     */
+    public $Helpers;
 
     /**
      * setUp
@@ -310,7 +313,7 @@ class HelperRegistryTest extends TestCase
     /**
      * Loading a helper with different config, should throw an exception
      *
-     * @expectedException RuntimeException
+     * @expectedException \RuntimeException
      * @expectedExceptionMessage The "Html" alias has already been loaded with the following
      * @return void
      */
@@ -323,7 +326,7 @@ class HelperRegistryTest extends TestCase
     /**
      * Loading a helper with different config, should throw an exception
      *
-     * @expectedException RuntimeException
+     * @expectedException \RuntimeException
      * @expectedExceptionMessage The "Html" alias has already been loaded with the following
      * @return void
      */

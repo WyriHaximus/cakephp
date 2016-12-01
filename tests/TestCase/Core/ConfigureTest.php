@@ -15,7 +15,6 @@
 namespace Cake\Test\TestCase\Core;
 
 use Cake\Cache\Cache;
-use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Core\Configure\Engine\PhpConfig;
 use Cake\Core\Plugin;
@@ -23,7 +22,6 @@ use Cake\TestSuite\TestCase;
 
 /**
  * ConfigureTest
- *
  */
 class ConfigureTest extends TestCase
 {
@@ -66,6 +64,31 @@ class ConfigureTest extends TestCase
             unlink(TMP . 'cache/persistent/test.php');
         }
         Configure::drop('test');
+    }
+
+    /**
+     * testReadOrFail method
+     *
+     * @return void
+     */
+    public function testReadOrFail()
+    {
+        $expected = 'ok';
+        Configure::write('This.Key.Exists', $expected);
+        $result = Configure::readOrFail('This.Key.Exists');
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
+     * testReadOrFail method
+     *
+     * @expectedException \RuntimeException
+     * @expectedExceptionMessage Expected configuration key "This.Key.Does.Not.exist" not found
+     * @return void
+     */
+    public function testReadOrFailThrowingException()
+    {
+        Configure::readOrFail('This.Key.Does.Not.exist');
     }
 
     /**

@@ -14,14 +14,12 @@
  */
 namespace Cake\Test\TestCase\Core\Configure\Engine;
 
-use Cake\Core\App;
 use Cake\Core\Configure\Engine\IniConfig;
 use Cake\Core\Plugin;
 use Cake\TestSuite\TestCase;
 
 /**
- * Class IniConfigTest
- *
+ * IniConfigTest
  */
 class IniConfigTest extends TestCase
 {

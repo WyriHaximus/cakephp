@@ -16,8 +16,7 @@
  */
 
 /**
- * Class SampleShell
- *
+ * SampleShell
  */
 namespace TestApp\Shell;
 
@@ -25,6 +24,8 @@ use Cake\Console\Shell;
 
 class SampleShell extends Shell
 {
+
+    public $tasks = ['Sample', 'Load'];
 
     /**
      * main method
@@ -34,5 +35,15 @@ class SampleShell extends Shell
     public function main()
     {
         $this->out('This is the main method called from SampleShell');
+    }
+
+    /**
+     * derp method
+     *
+     * @return void
+     */
+    public function derp()
+    {
+        $this->out('This is the example method called from TestPlugin.SampleShell');
     }
 }

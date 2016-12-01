@@ -47,9 +47,9 @@ class CompositeKeyTest extends TestCase
     public $fixtures = [
         'core.composite_increments',
         'core.site_articles',
+        'core.site_articles_tags',
         'core.site_authors',
-        'core.site_tags',
-        'core.site_articles_tags'
+        'core.site_tags'
     ];
 
     /**
@@ -351,7 +351,7 @@ class CompositeKeyTest extends TestCase
     }
 
     /**
-     * Tests loding hasOne with composite keys
+     * Tests loading hasOne with composite keys
      *
      * @dataProvider strategiesProviderHasOne
      * @return void
@@ -409,7 +409,7 @@ class CompositeKeyTest extends TestCase
      */
     public function testSaveNewEntity()
     {
-        $entity = new \Cake\ORM\Entity([
+        $entity = new Entity([
             'id' => 5,
             'site_id' => 1,
             'title' => 'Fifth Article',
@@ -435,7 +435,7 @@ class CompositeKeyTest extends TestCase
      */
     public function testSaveNewEntityMissingKey()
     {
-        $entity = new \Cake\ORM\Entity([
+        $entity = new Entity([
             'id' => 5,
             'title' => 'Fifth Article',
             'body' => 'Fifth Article Body',
@@ -453,7 +453,7 @@ class CompositeKeyTest extends TestCase
     public function testDelete()
     {
         $table = TableRegistry::get('SiteAuthors');
-        $table->save(new \Cake\ORM\Entity(['id' => 1, 'site_id' => 2]));
+        $table->save(new Entity(['id' => 1, 'site_id' => 2]));
         $entity = $table->get([1, 1]);
         $result = $table->delete($entity);
         $this->assertTrue($result);
@@ -588,11 +588,10 @@ class CompositeKeyTest extends TestCase
     public function testFindThreadedCompositeKeys()
     {
         $table = TableRegistry::get('SiteAuthors');
-        $query = $this->getMock(
-            '\Cake\ORM\Query',
-            ['_addDefaultFields', 'execute'],
-            [null, $table]
-        );
+        $query = $this->getMockBuilder('\Cake\ORM\Query')
+            ->setMethods(['_addDefaultFields', 'execute'])
+            ->setConstructorArgs([null, $table])
+            ->getMock();
 
         $items = new \Cake\Datasource\ResultSetDecorator([
             ['id' => 1, 'name' => 'a', 'site_id' => 1, 'parent_id' => null],

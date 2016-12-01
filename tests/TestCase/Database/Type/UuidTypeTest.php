@@ -15,15 +15,23 @@
 namespace Cake\Test\TestCase\Database\Type;
 
 use Cake\Database\Type;
-use Cake\Database\Type\UuidType;
 use Cake\TestSuite\TestCase;
-use \PDO;
+use PDO;
 
 /**
  * Test for the Uuid type.
  */
 class UuidTypeTest extends TestCase
 {
+    /**
+     * @var \Cake\Database\Type\UuidType
+     */
+    public $type;
+
+    /**
+     * @var \Cake\Database\Driver
+     */
+    public $driver;
 
     /**
      * Setup
@@ -34,7 +42,7 @@ class UuidTypeTest extends TestCase
     {
         parent::setUp();
         $this->type = Type::build('uuid');
-        $this->driver = $this->getMock('Cake\Database\Driver');
+        $this->driver = $this->getMockBuilder('Cake\Database\Driver')->getMock();
     }
 
     /**
@@ -65,6 +73,12 @@ class UuidTypeTest extends TestCase
 
         $result = $this->type->toDatabase(2, $this->driver);
         $this->assertSame('2', $result);
+
+        $result = $this->type->toDatabase(null, $this->driver);
+        $this->assertNull($result);
+
+        $result = $this->type->toDatabase('', $this->driver);
+        $this->assertNull($result);
     }
 
     /**
@@ -97,8 +111,11 @@ class UuidTypeTest extends TestCase
      *
      * @return void
      */
-    public function testMarshalEmptyString()
+    public function testMarshal()
     {
         $this->assertNull($this->type->marshal(''));
+        $this->assertSame('2', $this->type->marshal(2));
+        $this->assertSame('word', $this->type->marshal('word'));
+        $this->assertNull($this->type->marshal([1, 2]));
     }
 }

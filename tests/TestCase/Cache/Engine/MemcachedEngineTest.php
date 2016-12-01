@@ -16,13 +16,11 @@ namespace Cake\Test\TestCase\Cache\Engine;
 
 use Cake\Cache\Cache;
 use Cake\Cache\Engine\MemcachedEngine;
-use Cake\Core\Configure;
 use Cake\TestSuite\TestCase;
-use \Memcached;
+use Memcached;
 
 /**
- * Class TestMemcachedEngine
- *
+ * TestMemcachedEngine
  */
 class TestMemcachedEngine extends MemcachedEngine
 {
@@ -51,7 +49,6 @@ class TestMemcachedEngine extends MemcachedEngine
 
 /**
  * MemcachedEngineTest class
- *
  */
 class MemcachedEngineTest extends TestCase
 {
@@ -481,7 +478,7 @@ class MemcachedEngineTest extends TestCase
     {
         $Memcached = new TestMemcachedEngine();
         $result = $Memcached->parseServerString('unix:///path/to/memcachedd.sock');
-        $this->assertEquals(['unix:///path/to/memcachedd.sock', 0], $result);
+        $this->assertEquals(['/path/to/memcachedd.sock', 0], $result);
     }
 
     /**

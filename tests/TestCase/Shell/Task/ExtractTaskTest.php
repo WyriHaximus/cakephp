@@ -14,16 +14,13 @@
  */
 namespace Cake\Test\TestCase\Shell\Task;
 
-use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\Filesystem\Folder;
-use Cake\Shell\Task\ExtractTask;
 use Cake\TestSuite\TestCase;
 
 /**
  * ExtractTaskTest class
- *
  */
 class ExtractTaskTest extends TestCase
 {
@@ -36,16 +33,19 @@ class ExtractTaskTest extends TestCase
     public function setUp()
     {
         parent::setUp();
-        $this->io = $this->getMock('Cake\Console\ConsoleIo', [], [], '', false);
-        $progress = $this->getMock('Cake\Shell\Helper\ProgressHelper', [], [$this->io]);
+        $this->io = $this->getMockBuilder('Cake\Console\ConsoleIo')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $progress = $this->getMockBuilder('Cake\Shell\Helper\ProgressHelper')
+            ->setConstructorArgs([$this->io])
+            ->getMock();
         $this->io->method('helper')
             ->will($this->returnValue($progress));
 
-        $this->Task = $this->getMock(
-            'Cake\Shell\Task\ExtractTask',
-            ['in', 'out', 'err', '_stop'],
-            [$this->io]
-        );
+        $this->Task = $this->getMockBuilder('Cake\Shell\Task\ExtractTask')
+            ->setMethods(['in', 'out', 'err', '_stop'])
+            ->setConstructorArgs([$this->io])
+            ->getMock();
         $this->path = TMP . 'tests/extract_task_test';
         new Folder($this->path . DS . 'locale', true);
     }
@@ -89,18 +89,18 @@ class ExtractTaskTest extends TestCase
         $this->assertFalse(file_exists($this->path . DS . 'cake.pot'));
 
         // extract.ctp
-        $pattern = '/\#: (\\\\|\/)extract\.ctp:\d+;\d+\n';
+        $pattern = '/\#: Template[\/\\\\]Pages[\/\\\\]extract\.ctp:\d+;\d+\n';
         $pattern .= 'msgid "You have %d new message."\nmsgid_plural "You have %d new messages."/';
         $this->assertRegExp($pattern, $result);
 
         $pattern = '/msgid "You have %d new message."\nmsgstr ""/';
         $this->assertNotRegExp($pattern, $result, 'No duplicate msgid');
 
-        $pattern = '/\#: (\\\\|\/)extract\.ctp:\d+\n';
+        $pattern = '/\#: Template[\/\\\\]Pages[\/\\\\]extract\.ctp:\d+\n';
         $pattern .= 'msgid "You deleted %d message."\nmsgid_plural "You deleted %d messages."/';
         $this->assertRegExp($pattern, $result);
 
-        $pattern = '/\#: (\\\\|\/)extract\.ctp:\d+\nmsgid "';
+        $pattern = '/\#: Template[\/\\\\]Pages[\/\\\\]extract\.ctp:\d+\nmsgid "';
         $pattern .= 'Hot features!';
         $pattern .= '\\\n - No Configuration: Set-up the database and let the magic begin';
         $pattern .= '\\\n - Extremely Simple: Just look at the name...It\'s Cake';
@@ -111,12 +111,12 @@ class ExtractTaskTest extends TestCase
         $this->assertContains('msgid "double \\"quoted\\""', $result, 'Strings with quotes not handled correctly');
         $this->assertContains("msgid \"single 'quoted'\"", $result, 'Strings with quotes not handled correctly');
 
-        $pattern = '/\#: (\\\\|\/)extract\.ctp:\d+\n';
+        $pattern = '/\#: Template[\/\\\\]Pages[\/\\\\]extract\.ctp:\d+\n';
         $pattern .= 'msgctxt "mail"\n';
         $pattern .= 'msgid "letter"/';
         $this->assertRegExp($pattern, $result);
 
-        $pattern = '/\#: (\\\\|\/)extract\.ctp:\d+\n';
+        $pattern = '/\#: Template[\/\\\\]Pages[\/\\\\]extract\.ctp:\d+\n';
         $pattern .= 'msgctxt "alphabet"\n';
         $pattern .= 'msgid "letter"/';
         $this->assertRegExp($pattern, $result);
@@ -244,11 +244,10 @@ class ExtractTaskTest extends TestCase
     public function testExtractExcludePlugins()
     {
         Configure::write('App.namespace', 'TestApp');
-        $this->Task = $this->getMock(
-            'Cake\Shell\Task\ExtractTask',
-            ['_isExtractingApp', 'in', 'out', 'err', 'clear', '_stop'],
-            [$this->io]
-        );
+        $this->Task = $this->getMockBuilder('Cake\Shell\Task\ExtractTask')
+            ->setMethods(['_isExtractingApp', 'in', 'out', 'err', 'clear', '_stop'])
+            ->setConstructorArgs([$this->io])
+            ->getMock();
         $this->Task->expects($this->exactly(1))
             ->method('_isExtractingApp')
             ->will($this->returnValue(true));
@@ -263,7 +262,7 @@ class ExtractTaskTest extends TestCase
     }
 
     /**
-     * Test that is possible to extract messages form a single plugin
+     * Test that is possible to extract messages from a single plugin
      *
      * @return void
      */
@@ -271,11 +270,10 @@ class ExtractTaskTest extends TestCase
     {
         Configure::write('App.namespace', 'TestApp');
 
-        $this->Task = $this->getMock(
-            'Cake\Shell\Task\ExtractTask',
-            ['_isExtractingApp', 'in', 'out', 'err', 'clear', '_stop'],
-            [$this->io]
-        );
+        $this->Task = $this->getMockBuilder('Cake\Shell\Task\ExtractTask')
+            ->setMethods(['_isExtractingApp', 'in', 'out', 'err', 'clear', '_stop'])
+            ->setConstructorArgs([$this->io])
+            ->getMock();
 
         $this->Task->params['output'] = $this->path . DS;
         $this->Task->params['plugin'] = 'TestPlugin';
@@ -285,6 +283,30 @@ class ExtractTaskTest extends TestCase
         $this->assertNotRegExp('#Pages#', $result);
         $this->assertRegExp('/translate\.ctp:\d+/', $result);
         $this->assertContains('This is a translatable string', $result);
+    }
+
+    /**
+     * Test that is possible to extract messages from a vendored plugin.
+     *
+     * @return void
+     */
+    public function testExtractVendoredPlugin()
+    {
+        Configure::write('App.namespace', 'TestApp');
+
+        $this->Task = $this->getMockBuilder('Cake\Shell\Task\ExtractTask')
+            ->setMethods(['_isExtractingApp', 'in', 'out', 'err', 'clear', '_stop'])
+            ->setConstructorArgs([$this->io])
+            ->getMock();
+
+        $this->Task->params['output'] = $this->path . DS;
+        $this->Task->params['plugin'] = 'Company/TestPluginThree';
+
+        $this->Task->main();
+        $result = file_get_contents($this->path . DS . 'test_plugin_three.pot');
+        $this->assertNotRegExp('#Pages#', $result);
+        $this->assertRegExp('/default\.ctp:\d+/', $result);
+        $this->assertContains('A vendor message', $result);
     }
 
     /**

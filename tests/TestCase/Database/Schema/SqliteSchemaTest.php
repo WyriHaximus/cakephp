@@ -14,12 +14,13 @@
  */
 namespace Cake\Test\TestCase\Database\Schema;
 
-use Cake\Core\Configure;
+use Cake\Database\Driver\Sqlite;
 use Cake\Database\Schema\Collection as SchemaCollection;
 use Cake\Database\Schema\SqliteSchema;
 use Cake\Database\Schema\Table;
 use Cake\Datasource\ConnectionManager;
 use Cake\TestSuite\TestCase;
+use PDO;
 
 /**
  * Test case for Sqlite Schema Dialect.
@@ -149,10 +150,12 @@ class SqliteSchemaTest extends TestCase
             'default' => 'Default value',
         ];
 
-        $driver = $this->getMock('Cake\Database\Driver\Sqlite');
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlite')->getMock();
         $dialect = new SqliteSchema($driver);
 
-        $table = $this->getMock('Cake\Database\Schema\Table', [], ['table']);
+        $table = $this->getMockBuilder('Cake\Database\Schema\Table')
+            ->setConstructorArgs(['table'])
+            ->getMock();
         $table->expects($this->at(1))->method('addColumn')->with('field', $expected);
 
         $dialect->convertColumnDescription($table, $field);
@@ -166,7 +169,7 @@ class SqliteSchemaTest extends TestCase
      */
     public function testConvertCompositePrimaryKey()
     {
-        $driver = $this->getMock('Cake\Database\Driver\Sqlite');
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlite')->getMock();
         $dialect = new SqliteSchema($driver);
 
         $field1 = [
@@ -193,7 +196,7 @@ class SqliteSchemaTest extends TestCase
     /**
      * Creates tables for testing listTables/describe()
      *
-     * @param Connection $connection
+     * @param \Cake\Database\Connection $connection
      * @return void
      */
     protected function _createTables($connection)
@@ -221,11 +224,13 @@ SQL;
         $table = <<<SQL
 CREATE TABLE schema_articles (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
-title VARCHAR(20) DEFAULT 'testing',
+title VARCHAR(20) DEFAULT 'Let ''em eat cake',
 body TEXT,
 author_id INT(11) NOT NULL,
 published BOOLEAN DEFAULT 0,
 created DATETIME,
+field1 VARCHAR(10) DEFAULT NULL,
+field2 VARCHAR(10) DEFAULT 'NULL',
 CONSTRAINT "title_idx" UNIQUE ("title", "body")
 CONSTRAINT "author_idx" FOREIGN KEY ("author_id") REFERENCES "schema_authors" ("id") ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -288,11 +293,12 @@ SQL;
             'title' => [
                 'type' => 'string',
                 'null' => true,
-                'default' => 'testing',
+                'default' => 'Let \'em eat cake',
                 'length' => 20,
                 'precision' => null,
                 'fixed' => null,
                 'comment' => null,
+                'collate' => null,
             ],
             'body' => [
                 'type' => 'text',
@@ -301,6 +307,7 @@ SQL;
                 'length' => null,
                 'precision' => null,
                 'comment' => null,
+                'collate' => null,
             ],
             'author_id' => [
                 'type' => 'integer',
@@ -327,6 +334,26 @@ SQL;
                 'length' => null,
                 'precision' => null,
                 'comment' => null,
+            ],
+            'field1' => [
+                'type' => 'string',
+                'null' => true,
+                'default' => null,
+                'length' => 10,
+                'precision' => null,
+                'fixed' => null,
+                'comment' => null,
+                'collate' => null,
+            ],
+            'field2' => [
+                'type' => 'string',
+                'null' => true,
+                'default' => 'NULL',
+                'length' => 10,
+                'precision' => null,
+                'fixed' => null,
+                'comment' => null,
+                'collate' => null,
             ],
         ];
         $this->assertInstanceOf('Cake\Database\Schema\Table', $result);
@@ -426,7 +453,7 @@ SQL;
             [
                 'title',
                 ['type' => 'string', 'length' => 25, 'null' => true, 'default' => 'ignored'],
-                '"title" VARCHAR(25) DEFAULT NULL'
+                '"title" VARCHAR(25) DEFAULT "ignored"',
             ],
             [
                 'id',
@@ -452,6 +479,21 @@ SQL;
             [
                 'body',
                 ['type' => 'text', 'null' => false],
+                '"body" TEXT NOT NULL'
+            ],
+            [
+                'body',
+                ['type' => 'text', 'length' => Table::LENGTH_TINY, 'null' => false],
+                '"body" VARCHAR(' . Table::LENGTH_TINY . ') NOT NULL'
+            ],
+            [
+                'body',
+                ['type' => 'text', 'length' => Table::LENGTH_MEDIUM, 'null' => false],
+                '"body" TEXT NOT NULL'
+            ],
+            [
+                'body',
+                ['type' => 'text', 'length' => Table::LENGTH_LONG, 'null' => false],
                 '"body" TEXT NOT NULL'
             ],
             // Integers
@@ -510,7 +552,7 @@ SQL;
             // Boolean
             [
                 'checked',
-                ['type' => 'boolean', 'default' => false],
+                ['type' => 'boolean', 'null' => true, 'default' => false],
                 '"checked" BOOLEAN DEFAULT FALSE'
             ],
             [
@@ -542,6 +584,45 @@ SQL;
                 '"created" TIMESTAMP DEFAULT NULL'
             ],
         ];
+    }
+
+    /**
+     * Test the addConstraintSql method.
+     *
+     * @return void
+     */
+    public function testAddConstraintSql()
+    {
+        $driver = $this->_getMockedDriver();
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $connection->expects($this->any())->method('driver')
+            ->will($this->returnValue($driver));
+
+        $table = new Table('posts');
+
+        $result = $table->addConstraintSql($connection);
+        $this->assertEmpty($result);
+    }
+
+    /**
+     * Test the dropConstraintSql method.
+     *
+     * @return void
+     */
+    public function testDropConstraintSql()
+    {
+        $driver = $this->_getMockedDriver();
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $connection->expects($this->any())->method('driver')
+            ->will($this->returnValue($driver));
+
+        $table = new Table('posts');
+        $result = $table->dropConstraintSql($connection);
+        $this->assertEmpty($result);
     }
 
     /**
@@ -728,7 +809,9 @@ SQL;
     public function testCreateSql()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
@@ -741,6 +824,7 @@ SQL;
                 'null' => false,
             ])
             ->addColumn('body', ['type' => 'text'])
+            ->addColumn('data', ['type' => 'json'])
             ->addColumn('created', 'datetime')
             ->addConstraint('primary', [
                 'type' => 'primary',
@@ -756,6 +840,7 @@ CREATE TABLE "articles" (
 "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 "title" VARCHAR NOT NULL,
 "body" TEXT,
+"data" TEXT,
 "created" DATETIME
 )
 SQL;
@@ -776,7 +861,9 @@ SQL;
     public function testCreateTemporary()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
         $table = (new Table('schema_articles'))->addColumn('id', [
@@ -796,7 +883,9 @@ SQL;
     public function testCreateSqlCompositeIntegerKey()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
@@ -862,7 +951,9 @@ SQL;
     public function testDropSql()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
@@ -880,14 +971,15 @@ SQL;
     public function testTruncateSql()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
-        $statement = $this->getMock(
-            '\PDOStatement',
-            ['execute', 'rowCount', 'closeCursor', 'fetch']
-        );
+        $statement = $this->getMockBuilder('\PDOStatement')
+            ->setMethods(['execute', 'rowCount', 'closeCursor', 'fetch'])
+            ->getMock();
         $driver->connection()->expects($this->once())->method('prepare')
             ->with('SELECT 1 FROM sqlite_master WHERE name = "sqlite_sequence"')
             ->will($this->returnValue($statement));
@@ -911,14 +1003,15 @@ SQL;
     public function testTruncateSqlNoSequences()
     {
         $driver = $this->_getMockedDriver();
-        $connection = $this->getMock('Cake\Database\Connection', [], [], '', false);
+        $connection = $this->getMockBuilder('Cake\Database\Connection')
+            ->disableOriginalConstructor()
+            ->getMock();
         $connection->expects($this->any())->method('driver')
             ->will($this->returnValue($driver));
 
-        $statement = $this->getMock(
-            '\PDOStatement',
-            ['execute', 'rowCount', 'closeCursor', 'fetch']
-        );
+        $statement = $this->getMockBuilder('\PDOStatement')
+            ->setMethods(['execute', 'rowCount', 'closeCursor', 'fetch'])
+            ->getMock();
         $driver->connection()->expects($this->once())->method('prepare')
             ->with('SELECT 1 FROM sqlite_master WHERE name = "sqlite_sequence"')
             ->will($this->returnValue($statement));
@@ -934,23 +1027,26 @@ SQL;
     /**
      * Get a schema instance with a mocked driver/pdo instances
      *
-     * @return Driver
+     * @return \Cake\Database\Driver
      */
     protected function _getMockedDriver()
     {
-        $driver = new \Cake\Database\Driver\Sqlite();
-        $mock = $this->getMock('FakePdo', ['quote', 'quoteIdentifier', 'prepare']);
+        $driver = new Sqlite();
+        $pdo = PDO::class;
+        if (version_compare(PHP_VERSION, '5.6', '<')) {
+            $pdo = 'FakePdo';
+        }
+        $mock = $this->getMockBuilder($pdo)
+            ->setMethods(['quote', 'prepare'])
+            ->disableOriginalConstructor()
+            ->getMock();
         $mock->expects($this->any())
             ->method('quote')
             ->will($this->returnCallback(function ($value) {
                 return '"' . $value . '"';
             }));
-        $mock->expects($this->any())
-            ->method('quoteIdentifier')
-            ->will($this->returnCallback(function ($value) {
-                return '"' . $value . '"';
-            }));
         $driver->connection($mock);
+
         return $driver;
     }
 }

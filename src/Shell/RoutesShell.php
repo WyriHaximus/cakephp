@@ -15,13 +15,11 @@
 namespace Cake\Shell;
 
 use Cake\Console\Shell;
-use Cake\Core\Configure;
 use Cake\Routing\Exception\MissingRouteException;
 use Cake\Routing\Router;
 
 /**
  * Provides interactive CLI tools for routing.
- *
  */
 class RoutesShell extends Shell
 {
@@ -61,6 +59,9 @@ class RoutesShell extends Shell
                     break;
                 }
             }
+
+            unset($route['_matchedRoute']);
+
             $output = [
                 ['Route name', 'URI template', 'Defaults'],
                 [$name, $url, json_encode($route)]
@@ -68,8 +69,9 @@ class RoutesShell extends Shell
             $this->helper('table')->output($output);
             $this->out();
         } catch (MissingRouteException $e) {
-            $this->err("<warning>'$url' did not match any routes.</warning>");
+            $this->warn("'$url' did not match any routes.");
             $this->out();
+
             return false;
         }
     }
@@ -90,6 +92,7 @@ class RoutesShell extends Shell
         } catch (MissingRouteException $e) {
             $this->err("<warning>The provided parameters do not match any routes.</warning>");
             $this->out();
+
             return false;
         }
     }
@@ -114,6 +117,7 @@ class RoutesShell extends Shell
                 "Routing parameters should be supplied in a key:value format. " .
                 "For example `controller:Articles action:view 2`"
         ]);
+
         return $parser;
     }
 
@@ -134,6 +138,7 @@ class RoutesShell extends Shell
                 $out[] = $arg;
             }
         }
+
         return $out;
     }
 }

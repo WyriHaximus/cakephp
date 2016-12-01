@@ -18,7 +18,6 @@ use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\Datasource\ConnectionManager;
 use Cake\ORM\Entity;
-use Cake\ORM\Query;
 use Cake\ORM\ResultSet;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
@@ -30,7 +29,7 @@ use Cake\TestSuite\TestCase;
 class ResultSetTest extends TestCase
 {
 
-    public $fixtures = ['core.authors', 'core.articles', 'core.comments'];
+    public $fixtures = ['core.articles', 'core.authors', 'core.comments'];
 
     /**
      * setup
@@ -140,7 +139,7 @@ class ResultSetTest extends TestCase
 
         // Use a loop to test Iterator implementation
         foreach ($results as $i => $row) {
-            $expected = new \Cake\ORM\Entity($this->fixtureData[$i]);
+            $expected = new Entity($this->fixtureData[$i]);
             $expected->isNew(false);
             $expected->source($this->table->alias());
             $expected->clean();
@@ -260,7 +259,6 @@ class ResultSetTest extends TestCase
         $query = $this->table->find('all');
         $results = $query->all();
         $expected = [
-            'query' => $query,
             'items' => $results->toArray()
         ];
         $this->assertSame($expected, $results->__debugInfo());
@@ -291,6 +289,39 @@ class ResultSetTest extends TestCase
         $this->assertNull($comment->article);
         $this->assertEquals(1, $comment->id);
         $this->assertNotEmpty($comment->comment);
+    }
+
+    /**
+     * Test showing associated record is preserved when selecting only field with
+     * null value if auto fields is disabled.
+     *
+     * @return void
+     */
+    public function testBelongsToEagerLoaderWithAutoFieldsFalse()
+    {
+        $authors = TableRegistry::get('Authors');
+
+        $author = $authors->newEntity(['name' => null]);
+        $authors->save($author);
+
+        $articles = TableRegistry::get('Articles');
+        $articles->belongsTo('Authors');
+
+        $article = $articles->newEntity([
+            'author_id' => $author->id,
+            'title' => 'article with author with null name'
+        ]);
+        $articles->save($article);
+
+        $result = $articles->find()
+            ->select(['Articles.id', 'Articles.title', 'Authors.name'])
+            ->contain(['Authors'])
+            ->where(['Articles.id' => $article->id])
+            ->autoFields(false)
+            ->hydrate(false)
+            ->first();
+
+        $this->assertNotNull($result['author']);
     }
 
     /**
@@ -333,7 +364,7 @@ class ResultSetTest extends TestCase
         $query->autoFields(false);
 
         $row = ['Other__field' => 'test'];
-        $statement = $this->getMock('Cake\Database\StatementInterface');
+        $statement = $this->getMockBuilder('Cake\Database\StatementInterface')->getMock();
         $statement->method('fetch')
             ->will($this->onConsecutiveCalls($row, $row));
         $statement->method('rowCount')
@@ -367,5 +398,23 @@ class ResultSetTest extends TestCase
         })->first();
         $this->assertEquals('TestPlugin.Comments', $result->source());
         $this->assertEquals('TestPlugin.Authors', $result->_matchingData['Authors']->source());
+    }
+
+    /**
+     * Ensure that isEmpty() on a ResultSet doesn't result in loss
+     * of records. This behavior is provided by CollectionTrait.
+     *
+     * @return void
+     */
+    public function testIsEmptyDoesNotConsumeData()
+    {
+        $table = TableRegistry::get('Comments');
+        $query = $table->find()
+            ->formatResults(function ($results) {
+                return $results;
+            });
+        $res = $query->all();
+        $res->isEmpty();
+        $this->assertCount(6, $res->toArray());
     }
 }

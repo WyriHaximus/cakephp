@@ -15,17 +15,14 @@
 namespace Cake\Test\TestCase\ORM;
 
 use Cake\Core\Configure;
-use Cake\Database\Expression\QueryExpression;
 use Cake\Datasource\ConnectionManager;
 use Cake\ORM\Entity;
-use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
 use Cake\Utility\Text;
 
 /**
  * Integration tests for Table class with uuid primary keys.
- *
  */
 class TableUuidTest extends TestCase
 {

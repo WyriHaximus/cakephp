@@ -14,8 +14,7 @@
  */
 
 /**
- * Class ExampleShell
- *
+ * ExampleShell
  */
 namespace TestPluginTwo\Shell;
 
@@ -32,5 +31,15 @@ class ExampleShell extends Shell
     public function main()
     {
         $this->out('This is the main method called from TestPluginTwo.ExampleShell');
+    }
+
+    /**
+     * say_hello method
+     *
+     * @return void
+     */
+    public function say_hello()
+    {
+        $this->out('Hello from the TestPluginTwo.ExampleShell');
     }
 }

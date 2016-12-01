@@ -29,7 +29,6 @@ use SplFileObject;
  * engine available, or have content which is not performance sensitive.
  *
  * You can configure a FileEngine cache, using Cache::config()
- *
  */
 class FileEngine extends CacheEngine
 {
@@ -91,17 +90,18 @@ class FileEngine extends CacheEngine
         parent::init($config);
 
         if ($this->_config['path'] === null) {
-            $this->_config['path'] = sys_get_temp_dir() . DS . 'cake_cache' . DS;
+            $this->_config['path'] = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'cake_cache' . DIRECTORY_SEPARATOR;
         }
-        if (DS === '\\') {
+        if (DIRECTORY_SEPARATOR === '\\') {
             $this->_config['isWindows'] = true;
         }
-        if (substr($this->_config['path'], -1) !== DS) {
-            $this->_config['path'] .= DS;
+        if (substr($this->_config['path'], -1) !== DIRECTORY_SEPARATOR) {
+            $this->_config['path'] .= DIRECTORY_SEPARATOR;
         }
         if (!empty($this->_groupPrefix)) {
-            $this->_groupPrefix = str_replace('_', DS, $this->_groupPrefix);
+            $this->_groupPrefix = str_replace('_', DIRECTORY_SEPARATOR, $this->_groupPrefix);
         }
+
         return $this->_active();
     }
 
@@ -151,7 +151,7 @@ class FileEngine extends CacheEngine
 
         $duration = $this->_config['duration'];
         $expires = time() + $duration;
-        $contents = $expires . $lineBreak . $data . $lineBreak;
+        $contents = implode([$expires, $lineBreak, $data, $lineBreak]);
 
         if ($this->_config['lock']) {
             $this->_File->flock(LOCK_EX);
@@ -199,6 +199,7 @@ class FileEngine extends CacheEngine
             if ($this->_config['lock']) {
                 $this->_File->flock(LOCK_UN);
             }
+
             return false;
         }
 
@@ -221,6 +222,7 @@ class FileEngine extends CacheEngine
             }
             $data = unserialize((string)$data);
         }
+
         return $data;
     }
 
@@ -279,12 +281,13 @@ class FileEngine extends CacheEngine
                 continue;
             }
 
-            $path = $path->getRealPath() . DS;
+            $path = $path->getRealPath() . DIRECTORY_SEPARATOR;
             if (!in_array($path, $cleared)) {
                 $this->_clearDirectory($path, $now, $threshold);
                 $cleared[] = $path;
             }
         }
+
         return true;
     }
 
@@ -353,7 +356,7 @@ class FileEngine extends CacheEngine
     /**
      * Not implemented
      *
-     * @param string $key The key to decrement
+     * @param string $key The key to increment
      * @param int $offset The number to offset
      * @return void
      * @throws \LogicException
@@ -393,6 +396,7 @@ class FileEngine extends CacheEngine
                 $this->_File = $path->openFile('c+');
             } catch (Exception $e) {
                 trigger_error($e->getMessage(), E_USER_WARNING);
+
                 return false;
             }
             unset($path);
@@ -405,6 +409,7 @@ class FileEngine extends CacheEngine
                 ), E_USER_WARNING);
             }
         }
+
         return true;
     }
 
@@ -427,8 +432,10 @@ class FileEngine extends CacheEngine
                 '%s is not writable',
                 $this->_config['path']
             ), E_USER_WARNING);
+
             return false;
         }
+
         return true;
     }
 
@@ -445,10 +452,11 @@ class FileEngine extends CacheEngine
         }
 
         $key = Inflector::underscore(str_replace(
-            [DS, '/', '.', '<', '>', '?', ':', '|', '*', '"'],
+            [DIRECTORY_SEPARATOR, '/', '.', '<', '>', '?', ':', '|', '*', '"'],
             '_',
-            strval($key)
+            (string)$key
         ));
+
         return $key;
     }
 
@@ -467,7 +475,7 @@ class FileEngine extends CacheEngine
             RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($contents as $object) {
-            $containsGroup = strpos($object->getPathname(), DS . $group . DS) !== false;
+            $containsGroup = strpos($object->getPathname(), DIRECTORY_SEPARATOR . $group . DIRECTORY_SEPARATOR) !== false;
             $hasPrefix = true;
             if (strlen($this->_config['prefix']) !== 0) {
                 $hasPrefix = strpos($object->getBasename(), $this->_config['prefix']) === 0;
@@ -480,6 +488,7 @@ class FileEngine extends CacheEngine
                 //@codingStandardsIgnoreEnd
             }
         }
+
         return true;
     }
 }

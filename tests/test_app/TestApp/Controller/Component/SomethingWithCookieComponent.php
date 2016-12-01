@@ -18,6 +18,7 @@ use Cake\Controller\Component;
 /**
  * SomethingWithCookieComponent class
  *
+ * @property \Cake\Controller\Component\CookieComponent $Cookie
  */
 class SomethingWithCookieComponent extends Component
 {

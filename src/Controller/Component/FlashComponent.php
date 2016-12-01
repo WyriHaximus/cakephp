@@ -24,6 +24,9 @@ use Exception;
  * The CakePHP FlashComponent provides a way for you to write a flash variable
  * to the session from your controllers, to be rendered in a view with the
  * FlashHelper.
+ *
+ * @method void success(string $message, array $options = []) Set a message using "success" element
+ * @method void error(string $message, array $options = []) Set a message using "error" element
  */
 class FlashComponent extends Component
 {
@@ -50,7 +53,7 @@ class FlashComponent extends Component
     /**
      * Constructor
      *
-     * @param ComponentRegistry $registry A ComponentRegistry for this component
+     * @param \Cake\Controller\ComponentRegistry $registry A ComponentRegistry for this component
      * @param array $config Array of config.
      */
     public function __construct(ComponentRegistry $registry, array $config = [])
@@ -72,6 +75,7 @@ class FlashComponent extends Component
      * - `element` The element used to render the flash message. Default to 'default'.
      * - `params` An array of variables to make available when using an element
      * - `clear` A bool stating if the current stack should be cleared to start a new one
+     * - `escape` Set to false to allow templates to print out HTML content
      *
      * @param string|\Exception $message Message to be flashed. If an instance
      *   of \Exception the exception message will be used and code will be set
@@ -84,8 +88,14 @@ class FlashComponent extends Component
         $options += $this->config();
 
         if ($message instanceof Exception) {
-            $options['params'] += ['code' => $message->getCode()];
+            if (!isset($options['params']['code'])) {
+                $options['params']['code'] = $message->getCode();
+            }
             $message = $message->getMessage();
+        }
+
+        if (isset($options['escape']) && !isset($options['params']['escape'])) {
+            $options['params']['escape'] = $options['escape'];
         }
 
         list($plugin, $element) = pluginSplit($options['element']);
@@ -98,7 +108,7 @@ class FlashComponent extends Component
 
         $messages = [];
         if ($options['clear'] === false) {
-            $messages = $this->_session->read('Flash.' . $options['key']);
+            $messages = (array)$this->_session->read('Flash.' . $options['key']);
         }
 
         $messages[] = [

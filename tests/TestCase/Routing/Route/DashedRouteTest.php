@@ -14,7 +14,6 @@
  */
 namespace Cake\Test\TestCase\Routing\Route;
 
-use Cake\Core\App;
 use Cake\Routing\Router;
 use Cake\Routing\Route\DashedRoute;
 use Cake\TestSuite\TestCase;
@@ -146,21 +145,21 @@ class DashedRouteTest extends TestCase
     {
         $route = new DashedRoute('/:controller/:action/:id', [], ['id' => Router::ID]);
         $route->compile();
-        $result = $route->parse('/my-posts/my-view/1');
+        $result = $route->parse('/my-posts/my-view/1', 'GET');
         $this->assertEquals('MyPosts', $result['controller']);
         $this->assertEquals('myView', $result['action']);
         $this->assertEquals('1', $result['id']);
 
         $route = new DashedRoute('/:controller/:action-:id');
         $route->compile();
-        $result = $route->parse('/my-posts/my-view-1');
+        $result = $route->parse('/my-posts/my-view-1', 'GET');
         $this->assertEquals('MyPosts', $result['controller']);
         $this->assertEquals('myView', $result['action']);
         $this->assertEquals('1', $result['id']);
 
         $route = new DashedRoute('/:controller/:action/:slug-:id', [], ['id' => Router::ID]);
         $route->compile();
-        $result = $route->parse('/my-posts/my-view/the-slug-1');
+        $result = $route->parse('/my-posts/my-view/the-slug-1', 'GET');
         $this->assertEquals('MyPosts', $result['controller']);
         $this->assertEquals('myView', $result['action']);
         $this->assertEquals('1', $result['id']);
@@ -171,10 +170,10 @@ class DashedRouteTest extends TestCase
             ['prefix' => 'admin', 'action' => 'index']
         );
         $route->compile();
-        $result = $route->parse('/admin/');
+        $result = $route->parse('/admin/', 'GET');
         $this->assertFalse($result);
 
-        $result = $route->parse('/admin/my-posts');
+        $result = $route->parse('/admin/my-posts', 'GET');
         $this->assertEquals('MyPosts', $result['controller']);
         $this->assertEquals('index', $result['action']);
 
@@ -182,14 +181,35 @@ class DashedRouteTest extends TestCase
             '/media/search/*',
             ['controller' => 'Media', 'action' => 'searchIt']
         );
-        $result = $route->parse('/media/search');
+        $result = $route->parse('/media/search', 'GET');
         $this->assertEquals('Media', $result['controller']);
         $this->assertEquals('searchIt', $result['action']);
         $this->assertEquals([], $result['pass']);
 
-        $result = $route->parse('/media/search/tv_shows');
+        $result = $route->parse('/media/search/tv_shows', 'GET');
         $this->assertEquals('Media', $result['controller']);
         $this->assertEquals('searchIt', $result['action']);
         $this->assertEquals(['tv_shows'], $result['pass']);
+    }
+
+    /**
+     * @return void
+     */
+    public function testMatchThenParse()
+    {
+        $route = new DashedRoute('/plugin/:controller/:action', [
+            'plugin' => 'Vendor/PluginName'
+        ]);
+        $url = $route->match([
+            'plugin' => 'Vendor/PluginName',
+            'controller' => 'ControllerName',
+            'action' => 'actionName'
+        ]);
+        $expectedUrl = '/plugin/controller-name/action-name';
+        $this->assertEquals($expectedUrl, $url);
+        $result = $route->parse($expectedUrl, 'GET');
+        $this->assertEquals('ControllerName', $result['controller']);
+        $this->assertEquals('actionName', $result['action']);
+        $this->assertEquals('Vendor/PluginName', $result['plugin']);
     }
 }

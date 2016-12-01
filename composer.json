@@ -18,17 +18,20 @@
         "source": "https://github.com/cakephp/cakephp"
     },
     "require": {
-        "php": ">=5.4.16",
+        "php": ">=5.5.9",
         "ext-intl": "*",
         "ext-mbstring": "*",
-        "nesbot/Carbon": "1.13.*",
-        "ircmaxell/password-compat": "1.0.*",
+        "cakephp/chronos": "~1.0",
         "aura/intl": "1.1.*",
-        "psr/log": "1.0"
+        "psr/log": "1.0",
+        "zendframework/zend-diactoros": "~1.0"
+    },
+    "suggest": {
+        "ext-openssl": "To use Security::encrypt() or have secure CSRF token generation."
     },
     "require-dev": {
         "phpunit/phpunit": "*",
-        "cakephp/cakephp-codesniffer": "dev-master"
+        "cakephp/cakephp-codesniffer": "~2.1"
     },
     "autoload": {
         "psr-4": {
@@ -44,11 +47,12 @@
     "autoload-dev": {
         "psr-4": {
             "Cake\\Test\\": "tests",
-            "Company\\TestPluginThree\\Test\\": "tests/test_app/Plugin/Company/TestPluginThree/tests",
             "TestApp\\": "tests/test_app/TestApp",
             "TestPlugin\\": "tests/test_app/Plugin/TestPlugin/src",
             "TestPlugin\\Test\\": "tests/test_app/Plugin/TestPlugin/tests",
             "TestPluginTwo\\": "tests/test_app/Plugin/TestPluginTwo/src",
+            "Company\\TestPluginThree\\": "tests/test_app/Plugin/Company/TestPluginThree/src",
+            "Company\\TestPluginThree\\Test\\": "tests/test_app/Plugin/Company/TestPluginThree/tests",
             "PluginJs\\": "tests/test_app/Plugin/PluginJs/src"
         }
     },
@@ -65,5 +69,14 @@
         "cakephp/orm": "self.version",
         "cakephp/utility": "self.version",
         "cakephp/validation": "self.version"
+    },
+    "scripts": {
+        "check": [
+            "@cs-check",
+            "@test"
+        ],
+        "cs-check": "vendor/bin/phpcs --colors -p --standard=vendor/cakephp/cakephp-codesniffer/CakePHP ./src ./tests",
+        "cs-fix": "vendor/bin/phpcbf --colors --standard=vendor/cakephp/cakephp-codesniffer/CakePHP ./src ./tests",
+        "test": "vendor/bin/phpunit --colors=always"
     }
 }

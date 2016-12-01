@@ -15,15 +15,23 @@
 namespace Cake\Test\TestCase\Database\Type;
 
 use Cake\Database\Type;
-use Cake\Database\Type\BinaryType;
 use Cake\TestSuite\TestCase;
-use \PDO;
+use PDO;
 
 /**
  * Test for the Binary type.
  */
 class BinaryTypeTest extends TestCase
 {
+    /**
+     * @var \Cake\Database\Type\BinaryType
+     */
+    public $type;
+
+    /**
+     * @var \Cake\Database\Driver
+     */
+    public $driver;
 
     /**
      * Setup
@@ -34,7 +42,7 @@ class BinaryTypeTest extends TestCase
     {
         parent::setUp();
         $this->type = Type::build('binary');
-        $this->driver = $this->getMock('Cake\Database\Driver');
+        $this->driver = $this->getMockBuilder('Cake\Database\Driver')->getMock();
     }
 
     /**
@@ -63,7 +71,9 @@ class BinaryTypeTest extends TestCase
      */
     public function testToPHPSqlserver()
     {
-        $driver = $this->getMock('Cake\Database\Driver\Sqlserver', [], [], '', false);
+        $driver = $this->getMockBuilder('Cake\Database\Driver\Sqlserver')
+            ->disableOriginalConstructor()
+            ->getMock();
         $result = $this->type->toPHP('536F6D652076616C7565', $driver);
         $this->assertInternalType('resource', $result);
         $this->assertSame('Some value', stream_get_contents($result));

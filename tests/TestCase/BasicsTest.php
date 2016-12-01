@@ -16,12 +16,8 @@
  */
 namespace Cake\Test\TestCase;
 
-use Cake\Cache\Cache;
-use Cake\Core\App;
 use Cake\Core\Configure;
 use Cake\Event\EventManager;
-use Cake\Filesystem\Folder;
-use Cake\Log\Log;
 use Cake\Network\Response;
 use Cake\TestSuite\TestCase;
 
@@ -62,6 +58,11 @@ class BasicsTest extends TestCase
         $two = ['minYear' => null, 'maxYear' => null, 'separator' => '-', 'interval' => 1, 'monthNames' => true];
         $result = array_diff_key($one, $two);
         $this->assertSame([], $result);
+
+        $one = ['minYear' => null, 'maxYear' => null, 'separator' => '-', 'interval' => 1, 'monthNames' => true];
+        $two = [];
+        $result = array_diff_key($one, $two);
+        $this->assertSame($one, $result);
     }
 
     /**
@@ -223,7 +224,7 @@ class BasicsTest extends TestCase
     public function testDebug()
     {
         ob_start();
-        debug('this-is-a-test', false);
+        $this->assertEquals('this-is-a-test', debug('this-is-a-test', false));
         $result = ob_get_clean();
         $expectedText = <<<EXPECTED
 %s (line %d)
@@ -237,7 +238,8 @@ EXPECTED;
         $this->assertEquals($expected, $result);
 
         ob_start();
-        debug('<div>this-is-a-test</div>', true);
+        $value = '<div>this-is-a-test</div>';
+        $this->assertSame($value, debug($value, true));
         $result = ob_get_clean();
         $expectedHtml = <<<EXPECTED
 <div class="cake-debug-output">
@@ -296,7 +298,7 @@ EXPECTED;
 ###########################
 
 EXPECTED;
-        if (PHP_SAPI === 'cli') {
+        if ((PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg')) {
             $expected = sprintf($expectedText, str_replace(CAKE_CORE_INCLUDE_PATH, '', __FILE__), __LINE__ - 18);
         } else {
             $expected = sprintf($expectedHtml, str_replace(CAKE_CORE_INCLUDE_PATH, '', __FILE__), __LINE__ - 19);
@@ -321,7 +323,7 @@ EXPECTED;
 ###########################
 
 EXPECTED;
-        if (PHP_SAPI === 'cli') {
+        if ((PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg')) {
             $expected = sprintf($expectedText, str_replace(CAKE_CORE_INCLUDE_PATH, '', __FILE__), __LINE__ - 18);
         } else {
             $expected = sprintf($expectedHtml, str_replace(CAKE_CORE_INCLUDE_PATH, '', __FILE__), __LINE__ - 19);
@@ -368,7 +370,7 @@ EXPECTED;
         $this->assertEquals($expected, $result);
 
         ob_start();
-        debug(false, false, false);
+        $this->assertFalse(debug(false, false, false));
         $result = ob_get_clean();
         $expected = <<<EXPECTED
 
@@ -389,25 +391,25 @@ EXPECTED;
     public function testPr()
     {
         ob_start();
-        pr(true);
+        $this->assertTrue(pr(true));
         $result = ob_get_clean();
         $expected = "\n1\n\n";
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pr(false);
+        $this->assertFalse(pr(false));
         $result = ob_get_clean();
         $expected = "\n\n\n";
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pr(null);
+        $this->assertNull(pr(null));
         $result = ob_get_clean();
         $expected = "\n\n\n";
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pr(123);
+        $this->assertSame(123, pr(123));
         $result = ob_get_clean();
         $expected = "\n123\n\n";
         $this->assertEquals($expected, $result);
@@ -439,25 +441,25 @@ EXPECTED;
     public function testPj()
     {
         ob_start();
-        pj(true);
+        $this->assertTrue(pj(true));
         $result = ob_get_clean();
         $expected = "\ntrue\n\n";
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pj(false);
+        $this->assertFalse(pj(false));
         $result = ob_get_clean();
         $expected = "\nfalse\n\n";
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pj(null);
+        $this->assertNull(pj(null));
         $result = ob_get_clean();
         $expected = "\nnull\n\n";
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pj(123);
+        $this->assertSame(123, pj(123));
         $result = ob_get_clean();
         $expected = "\n123\n\n";
         $this->assertEquals($expected, $result);
@@ -475,7 +477,8 @@ EXPECTED;
         $this->assertEquals($expected, $result);
 
         ob_start();
-        pj(['this' => 'is', 'a' => 'test', 123 => 456]);
+        $value = ['this' => 'is', 'a' => 'test', 123 => 456];
+        $this->assertSame($value, pj($value));
         $result = ob_get_clean();
         $expected = "\n{\n    \"this\": \"is\",\n    \"a\": \"test\",\n    \"123\": 456\n}\n\n";
         $this->assertEquals($expected, $result);
